@@ -25,3 +25,6 @@ build/
 
 # Type checking
 .mypy_cache/
+
+# Web interface uploads
+uploads/

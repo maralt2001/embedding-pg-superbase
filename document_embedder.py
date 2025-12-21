@@ -378,7 +378,8 @@ class DocumentEmbedder:
 
     def process_document(self, file_path: str, table_name: str = "documents",
                          chunk_size: int = 1000, overlap: int = 200, strategy: str = "character",
-                         similarity_threshold: float = 0.75, skip_if_exists: bool = True):
+                         similarity_threshold: float = 0.75, skip_if_exists: bool = True,
+                         progress_callback=None, document_name: str = None):
         """
         Full pipeline: read document, chunk, embed, and upload
 
@@ -390,9 +391,12 @@ class DocumentEmbedder:
             strategy: Chunking strategy - "character", "paragraph", or "semantic"
             similarity_threshold: Similarity threshold for semantic chunking (0.0-1.0)
             skip_if_exists: If True, skip processing if document hash hasn't changed
+            progress_callback: Optional callback function(stage, message) for progress updates
+            document_name: Optional document name to use instead of extracting from file_path
         """
         file_path_obj = Path(file_path)
-        document_name = file_path_obj.name
+        if document_name is None:
+            document_name = file_path_obj.name
 
         # Calculate file hash
         print(f"Calculating file hash for: {document_name}")
@@ -405,15 +409,21 @@ class DocumentEmbedder:
             if existing_hash:
                 if existing_hash == current_hash:
                     print(f"✓ Document unchanged, skipping: {document_name}")
-                    return "skipped"
+                    return {"skipped": True, "chunks_created": 0}
                 else:
                     print(f"Document changed, updating: {document_name}")
                     self.storage.delete_document_chunks(document_name, table_name)
             else:
                 print(f"New document, processing: {document_name}")
 
+        if progress_callback:
+            progress_callback("reading", "Reading document...")
+
         print(f"Reading document: {file_path}")
         text = self.read_document(file_path)
+
+        if progress_callback:
+            progress_callback("chunking", "Splitting document into chunks...")
 
         if strategy == "semantic":
             print(f"Chunking text by semantic similarity (threshold={similarity_threshold}, max_size={chunk_size})")
@@ -430,6 +440,9 @@ class DocumentEmbedder:
         processed_at = datetime.utcnow().isoformat()
 
         for i, chunk in enumerate(chunks, 1):
+            if progress_callback:
+                progress_callback("embedding", f"Generating embeddings... ({i}/{len(chunks)})")
+
             print(f"Processing chunk {i}/{len(chunks)}")
             embedding = self.get_embedding(chunk)
             chunks_with_embeddings.append({
@@ -441,7 +454,10 @@ class DocumentEmbedder:
                 "processed_at": processed_at
             })
 
+        if progress_callback:
+            progress_callback("uploading", "Uploading chunks to database...")
+
         print("Uploading to storage...")
         self.storage.upload_chunks(chunks_with_embeddings, table_name)
         print("Done!")
-        return "processed"
+        return {"skipped": False, "chunks_created": len(chunks)}

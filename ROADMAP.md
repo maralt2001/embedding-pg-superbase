@@ -30,14 +30,28 @@
 - [x] Optimiert mit pgvector wenn verfügbar
 - [ ] Erweiterte Filterung und Ranking (für spätere Iteration)
 
-## Planned Features
+### 9. Web-Interface ✓
+- [x] FastAPI Backend mit REST API
+- [x] Upload-Interface für Dokumente (Drag & Drop)
+- [x] Echtzeit-Progress-Tracking mit Polling
+- [x] Search-Interface mit konfigurierbarem Result-Limit
+- [x] Dokumenten-Verwaltung (Liste, Löschen)
+- [x] Settings-Anzeige (read-only)
+- [x] Responsive Design mit Vanilla JavaScript (kein Build-Step)
+- [x] Background-Task-Verarbeitung
+- [x] Support für beide Storage-Backends (Supabase & PostgreSQL)
+- [ ] WebSocket für Real-Time Updates (geplant)
+- [ ] Batch-Upload mehrerer Dateien (geplant)
 
 ### 2. Batch-Verarbeitung ✓ (Teilweise)
 - [x] Mehrere Dokumente auf einmal verarbeiten (ganzer Ordner)
 - [x] Zusammenfassendes Reporting
-- [ ] Progress-Bar für längere Prozesse
+- [x] Progress-Tracking im Web-Interface
+- [ ] Progress-Bar für CLI (geplant)
 - **Implementierungsaufwand**: Niedrig
 - **Nutzen**: Hoch - spart Zeit bei vielen Dokumenten
+
+## Planned Features
 
 ### 3. Metadaten-Tracking (teilweise implementiert)
 - [x] Zeitstempel wann Dokument verarbeitet wurde
@@ -61,13 +75,6 @@
 - **Implementierungsaufwand**: Niedrig
 - **Nutzen**: Mittel - besseres Debugging
 
-### 9. Web-Interface
-- Einfaches FastAPI/Flask Frontend
-- Upload-Interface für Dokumente
-- Search-Interface
-- **Implementierungsaufwand**: Hoch
-- **Nutzen**: Hoch - deutlich bessere UX
-
 ### 10. Weitere Dokumentformate
 - Markdown, HTML, CSV
 - PowerPoint (PPTX)
@@ -87,16 +94,17 @@
 1. ✓ **Batch-Verarbeitung** - macht das Tool viel praktischer
 2. ✓ **CLI mit Argumenten** - bessere Developer Experience
 3. ✓ **Semantic Search / Query-Funktion** - macht Embeddings nutzbar
+4. ✓ **Web-Interface** - deutlich bessere UX mit GUI
 
 ### Quick Wins (geringer Aufwand, hoher Nutzen):
-1. **Progress-Bar für Batch-Verarbeitung** - besseres Feedback bei vielen Dokumenten
-2. **Logging & Monitoring** - hilfreich für Debugging
+1. **Logging & Monitoring** - hilfreich für Debugging
+2. **WebSocket für Web-Interface** - noch besseres Real-Time Feedback
 
 ### High Impact (mittlerer Aufwand, sehr hoher Nutzen):
 1. **RAG System** - vollständiges QA-System
 2. **Erweiterte Metadaten** - bessere Filterung und Organisation
 
 ### Nice to Have:
-1. Web-Interface - wenn GUI gewünscht
-2. Weitere Dokumentformate - je nach Bedarf
-3. OCR-Support - für spezielle Anforderungen
+1. Weitere Dokumentformate - je nach Bedarf
+2. OCR-Support - für spezielle Anforderungen
+3. Batch-Upload im Web-Interface - mehrere Dateien gleichzeitig

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Embedding Pipeline</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Document Embedding Pipeline</h1>
+            <p class="subtitle">Upload, embed, and search your documents</p>
+        </header>
+
+        <!-- Tab navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="upload">
+                <span>📤</span> Upload
+            </button>
+            <button class="tab-btn" data-tab="search">
+                <span>🔍</span> Search
+            </button>
+            <button class="tab-btn" data-tab="documents">
+                <span>📚</span> Documents
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span>⚙️</span> Settings
+            </button>
+        </div>
+
+        <!-- Upload tab -->
+        <div id="upload-tab" class="tab-content active">
+            <div class="card">
+                <h2>Upload Document</h2>
+                <p class="info-text">Supported formats: PDF, DOCX, TXT (max 50MB)</p>
+
+                <div class="upload-zone" id="dropZone">
+                    <div class="upload-icon">📄</div>
+                    <p>Drag & drop file here or click to browse</p>
+                    <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display: none;">
+                    <button type="button" class="btn btn-primary" id="browseBtn">Choose File</button>
+                </div>
+
+                <div id="uploadProgress" class="upload-progress hidden">
+                    <div class="progress-header">
+                        <h3 id="uploadFilename">Processing...</h3>
+                        <span id="uploadStatus" class="status-badge">Processing</span>
+                    </div>
+                    <p id="progressMessage" class="progress-message">Initializing...</p>
+                    <div class="progress-bar-container">
+                        <div id="progressFill" class="progress-bar-fill"></div>
+                    </div>
+                    <div id="resultMessage" class="result-message hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search tab -->
+        <div id="search-tab" class="tab-content">
+            <div class="card">
+                <h2>Semantic Search</h2>
+                <p class="info-text">Search across all your embedded documents using natural language</p>
+
+                <div class="search-form">
+                    <input
+                        type="text"
+                        id="searchQuery"
+                        class="search-input"
+                        placeholder="Enter your search query (e.g., 'What is machine learning?')"
+                    >
+                    <div class="search-controls">
+                        <select id="searchLimit" class="select-input">
+                            <option value="5">5 results</option>
+                            <option value="10">10 results</option>
+                            <option value="20">20 results</option>
+                        </select>
+                        <button id="searchBtn" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+
+                <div id="searchResults" class="search-results"></div>
+            </div>
+        </div>
+
+        <!-- Documents tab -->
+        <div id="documents-tab" class="tab-content">
+            <div class="card">
+                <h2>Processed Documents</h2>
+                <p class="info-text">View and manage all your embedded documents</p>
+
+                <button id="refreshDocumentsBtn" class="btn btn-secondary">🔄 Refresh</button>
+
+                <div id="documentsContainer" class="documents-container">
+                    <div class="loading">Loading documents...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="card">
+                <h2>Configuration</h2>
+                <p class="info-text">System configuration</p>
+
+                <!-- Backend Selection -->
+                <div class="config-section">
+                    <h3>Storage Backend</h3>
+                    <div class="backend-selector">
+                        <label for="backendSelect">Select Backend:</label>
+                        <select id="backendSelect" class="select-input">
+                            <option value="postgresql">PostgreSQL (Local)</option>
+                            <option value="supabase">Supabase (Cloud)</option>
+                        </select>
+                        <button id="saveBackendBtn" class="btn btn-primary">Save Backend</button>
+                    </div>
+                    <div id="backendMessage" class="backend-message hidden"></div>
+                </div>
+
+                <!-- Read-only Configuration Display -->
+                <div class="config-section">
+                    <h3>Other Settings (Read-Only)</h3>
+                    <div id="configDisplay" class="config-display">
+                        <div class="loading">Loading configuration...</div>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Note:</strong> Other settings are managed via environment variables (.env file).
+                        Restart the server after making changes.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Document Embedding Pipeline v1.0 | Powered by FastAPI & LM Studio</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

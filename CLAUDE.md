@@ -6,10 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a document embedding pipeline that:
 1. Reads documents (PDF, DOCX, TXT)
-2. Chunks text with configurable strategies (character-based or paragraph-based)
+2. Chunks text with configurable strategies (character-based, paragraph-based, or semantic)
 3. Generates embeddings via LM Studio (local embedding server)
 4. Stores chunks and embeddings in your choice of storage backend (Supabase or local PostgreSQL)
 5. Implements incremental updates to avoid reprocessing unchanged documents
+6. Provides both CLI and web interface for easy interaction
 
 ## Environment Setup
 
@@ -47,9 +48,11 @@ SKIP_IF_EXISTS=true  # Optional: Skip unchanged documents (default: true)
 ```
 
 **Backend Selection:**
-- If `STORAGE_BACKEND` is set, that backend will be used
-- If not set, the system auto-detects based on available credentials
-- Existing `.env` files with only Supabase config continue to work unchanged
+- **Default**: PostgreSQL (if `STORAGE_BACKEND` is not set)
+- If `STORAGE_BACKEND` is set in `.env`, that backend will be used
+- **Web Interface**: Backend can be dynamically changed via Settings tab without server restart
+- **CLI**: Backend is determined at startup from `.env` or `--backend` argument
+- Configuration is shared between CLI and web interface
 
 ## Development Commands
 
@@ -147,6 +150,86 @@ python cli.py search --help
 python cli.py status --help
 ```
 
+### Web Interface Usage
+
+The project includes a modern web-based interface built with FastAPI and vanilla JavaScript. This provides a user-friendly GUI alternative to the CLI.
+
+**Start the Web Server:**
+```bash
+# Default (runs on port 8000)
+uvicorn web_app:app --reload
+
+# Custom port
+uvicorn web_app:app --reload --port 8080
+
+# Make accessible from network (0.0.0.0)
+uvicorn web_app:app --host 0.0.0.0 --port 8000
+
+# Production mode (without reload)
+uvicorn web_app:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+**Access the Interface:**
+Open your browser and navigate to `http://localhost:8000`
+
+**Web Interface Features:**
+
+1. **Upload Tab** - Document Processing
+   - Drag & drop or click to browse for files (PDF, DOCX, TXT)
+   - Real-time progress tracking with visual progress bar
+   - Automatic duplicate detection (respects `SKIP_IF_EXISTS` setting)
+   - Shows processing stages: reading → chunking → embedding → uploading
+   - Maximum file size: 50MB
+   - Display of processing results (chunks created, processing time)
+
+2. **Search Tab** - Semantic Search
+   - Natural language query input
+   - Configurable result limit (5, 10, or 20 results)
+   - Results displayed with similarity scores (percentage match)
+   - Document name and chunk index for each result
+   - Content preview with expandable text
+
+3. **Documents Tab** - Document Management
+   - List of all processed documents
+   - Shows chunk count and processing timestamp for each document
+   - Delete functionality with confirmation dialog
+   - Refresh button to reload document list
+
+4. **Settings Tab** - Configuration & Backend Selection
+   - **Dynamic Backend Switching**: Select between PostgreSQL and Supabase via dropdown
+   - Real-time backend switching without server restart
+   - Success/error feedback for backend changes
+   - Read-only display of other settings: LM Studio URL, table name, chunk size, chunking strategy, etc.
+   - Note: Other configuration changes must be made via `.env` file (requires server restart)
+
+**Technical Details:**
+- Uses same `.env` configuration as CLI
+- **Default backend: PostgreSQL** (can be changed via Settings tab or `.env`)
+- Dynamic backend switching without server restart
+- Works with both Supabase and PostgreSQL backends
+- Background task processing (non-blocking uploads)
+- In-memory task store with automatic cleanup (1 hour retention)
+- Progress polling every 1.5 seconds
+- Responsive design (mobile-friendly)
+- No build step required (vanilla JavaScript)
+
+**API Endpoints:**
+The web interface exposes the following REST API endpoints:
+- `POST /api/documents/upload` - Upload and process document
+- `GET /api/tasks/{task_id}` - Get task status/progress
+- `GET /api/documents` - List all documents
+- `DELETE /api/documents/{name}` - Delete document
+- `GET /api/search?query=...&limit=5` - Semantic search
+- `GET /api/config` - Get current configuration
+- `PUT /api/config?backend_type=...` - Change storage backend (postgresql or supabase)
+
+**Environment Variables for Web Interface:**
+```bash
+WEB_PORT=8000  # Optional: Override default port
+```
+
+All other configuration uses the same environment variables as the CLI (see Common Configuration section above).
+
 ### Supabase Database Setup (if using Supabase backend)
 
 1. **Create a Supabase project** at https://supabase.com
@@ -240,13 +323,38 @@ python main.py
 - Batch processing support (multiple files or directory)
 - Comprehensive help messages and examples
 
+**web_app.py**
+- FastAPI web application providing REST API and web interface
+- API endpoints for upload, search, status, delete operations
+- Background task processing for document uploads
+- In-memory task store for progress tracking
+- CORS middleware for development
+- Static file serving for frontend
+- Automatic cleanup of old tasks and uploaded files
+
+**web_service.py**
+- Service layer wrapper around DocumentEmbedder for web interface
+- `WebEmbeddingService`: Provides progress tracking with callbacks
+- Updates task store at each processing stage
+- Handles file cleanup after processing
+- Maps progress stages: reading → chunking → embedding → uploading
+
+**static/** (Frontend assets)
+- `index.html`: Tab-based UI (Upload, Search, Documents, Settings)
+- `style.css`: Responsive design with gradient theme
+- `app.js`: Vanilla JavaScript for all UI interactions
+  - File upload with drag & drop
+  - Progress polling (1.5 second intervals)
+  - Search and document management
+  - Tab switching and UI state management
+
 **main.py**
 - Legacy entry point that loads environment variables and processes documents
 - Configurable via environment variables for all major parameters
 - Handles storage backend selection and initialization
 - Handles skipped vs. processed document status
 - Example usage with error handling
-- Note: `cli.py` is recommended for new usage
+- Note: `cli.py` or web interface is recommended for new usage
 
 ### External Dependencies
 
@@ -368,3 +476,17 @@ Query your embedded documents using natural language:
 - Returns relevance scores and content previews
 - Works with both Supabase and PostgreSQL backends
 - Optimized with pgvector when available
+
+### 7. Web Interface
+Modern, user-friendly GUI built with FastAPI and vanilla JavaScript:
+- **Upload Tab**: Drag & drop file upload with real-time progress tracking
+- **Search Tab**: Natural language semantic search with configurable result limits
+- **Documents Tab**: List and manage all processed documents
+- **Settings Tab**: Dynamic backend switching (PostgreSQL ↔ Supabase) without server restart
+- Background task processing (non-blocking uploads)
+- Progress polling with visual feedback (reading → chunking → embedding → uploading)
+- Responsive design (mobile-friendly)
+- No build step required
+- **Default backend**: PostgreSQL
+- Works with both storage backends
+- REST API endpoints for programmatic access
