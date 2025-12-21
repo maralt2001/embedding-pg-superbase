@@ -119,24 +119,57 @@ class SupabaseBackend(StorageBackend):
     def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
         """Search for similar chunks using Supabase's vector similarity"""
         try:
-            # Note: Supabase RPC functions work with fixed table names
-            # For custom tables, create separate functions (e.g., match_my_docs)
-            function_name = f'match_{table_name}' if table_name != 'documents' else 'match_documents'
+            # Fetch all documents and calculate similarity in Python
+            # This is less efficient but works without requiring SQL functions
+            print("Fetching documents from Supabase...")
 
-            # Use Supabase RPC function for similarity search
-            response = self.client.rpc(
-                function_name,
-                {
-                    'query_embedding': query_embedding,
-                    'match_threshold': 0.0,
-                    'match_count': limit
-                }
-            ).execute()
+            response = self.client.table(table_name)\
+                .select("id, content, document_name, chunk_index, embedding, file_hash, processed_at")\
+                .execute()
 
-            return response.data if response.data else []
+            if not response.data:
+                return []
+
+            # Calculate cosine similarity for each document
+            import math
+
+            results = []
+            for item in response.data:
+                if 'embedding' not in item or not item['embedding']:
+                    continue
+
+                doc_embedding = item['embedding']
+
+                # Convert embedding if it's a string (sometimes Supabase returns it as a string)
+                if isinstance(doc_embedding, str):
+                    import json
+                    doc_embedding = json.loads(doc_embedding)
+
+                # Ensure both embeddings are lists of floats
+                doc_embedding = [float(x) for x in doc_embedding]
+                query_emb = [float(x) for x in query_embedding]
+
+                # Calculate cosine similarity
+                dot_product = sum(a * b for a, b in zip(query_emb, doc_embedding))
+                magnitude1 = math.sqrt(sum(a * a for a in query_emb))
+                magnitude2 = math.sqrt(sum(a * a for a in doc_embedding))
+
+                if magnitude1 == 0 or magnitude2 == 0:
+                    similarity = 0.0
+                else:
+                    similarity = dot_product / (magnitude1 * magnitude2)
+
+                item['similarity'] = similarity
+                results.append(item)
+
+            # Sort by similarity (highest first) and limit results
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            return results[:limit]
+
         except Exception as e:
             print(f"Error searching chunks: {e}")
-            print(f"Note: Make sure you have created the '{function_name}' function in Supabase")
+            print("Note: This method fetches all chunks and calculates similarity in Python.")
+            print("For better performance with large datasets, create the match_documents function.")
             print("See supabase_setup.sql for the SQL function definition")
             raise
 
