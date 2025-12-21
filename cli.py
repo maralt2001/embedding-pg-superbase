@@ -222,6 +222,45 @@ def cmd_status(args):
         sys.exit(1)
 
 
+def cmd_delete(args):
+    """Handle 'delete' command - delete a document and all its chunks"""
+    embedder = create_embedder_from_args(args)
+
+    table_name = args.table or os.getenv("TABLE_NAME", "documents")
+    document_name = args.document_name
+
+    print(f"Document to delete: {document_name}")
+    print(f"Table: {table_name}")
+
+    # Check if document exists first
+    try:
+        existing_hash = embedder.storage.check_document_exists(document_name, table_name)
+
+        if not existing_hash:
+            print(f"\n❌ Document '{document_name}' not found in table '{table_name}'.")
+            print("\nTip: Use 'python cli.py status' to see all documents in the database.")
+            sys.exit(1)
+
+        # Confirm deletion
+        if not args.force:
+            print(f"\n⚠️  Warning: This will permanently delete all chunks for '{document_name}'")
+            response = input("Are you sure you want to continue? (yes/no): ")
+
+            if response.lower() not in ['yes', 'y']:
+                print("Deletion cancelled.")
+                return
+
+        # Delete the document
+        print(f"\nDeleting all chunks for '{document_name}'...")
+        embedder.storage.delete_document_chunks(document_name, table_name)
+
+        print(f"✅ Successfully deleted '{document_name}' and all its chunks from table '{table_name}'")
+
+    except Exception as e:
+        print(f"❌ Error deleting document: {e}")
+        sys.exit(1)
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -246,6 +285,12 @@ Examples:
 
   # Show status of processed documents
   python cli.py status
+
+  # Delete a document and all its chunks
+  python cli.py delete document.pdf
+
+  # Delete without confirmation prompt
+  python cli.py delete --force document.pdf
 
   # Use custom settings
   python cli.py embed --chunk-size 500 --strategy paragraph document.pdf
@@ -293,6 +338,12 @@ Examples:
     # STATUS command
     status_parser = subparsers.add_parser('status', help='Show status of processed documents')
 
+    # DELETE command
+    delete_parser = subparsers.add_parser('delete', help='Delete a document and all its chunks')
+    delete_parser.add_argument('document_name', help='Name of the document to delete (e.g., "document.pdf")')
+    delete_parser.add_argument('--force', action='store_true',
+                             help='Skip confirmation prompt')
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -310,6 +361,8 @@ Examples:
         cmd_search(args)
     elif args.command == 'status':
         cmd_status(args)
+    elif args.command == 'delete':
+        cmd_delete(args)
 
 
 if __name__ == "__main__":

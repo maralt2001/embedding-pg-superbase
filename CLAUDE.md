@@ -62,7 +62,7 @@ pip install -r requirements.txt
 
 ### CLI Usage
 
-The project provides a comprehensive command-line interface via `cli.py` with three main commands:
+The project provides a comprehensive command-line interface via `cli.py` with four main commands:
 
 **1. Embed Documents** (process and generate embeddings)
 ```bash
@@ -106,6 +106,18 @@ python cli.py status
 
 # Show status for specific table
 python cli.py status --table my_docs
+```
+
+**4. Delete Documents** (remove a document and all its chunks)
+```bash
+# Delete a document (with confirmation prompt)
+python cli.py delete document.pdf
+
+# Delete without confirmation
+python cli.py delete --force document.pdf
+
+# Delete from specific table
+python cli.py --table my_docs delete document.pdf
 ```
 
 **Global Options** (apply to all commands):
@@ -202,7 +214,7 @@ python main.py
 
 **cli.py**
 - Command-line interface with argparse support
-- Three main commands: `embed`, `search`, `status`
+- Four main commands: `embed`, `search`, `status`, `delete`
 - Supports all configuration via CLI arguments or environment variables
 - Batch processing support (multiple files or directory)
 - Comprehensive help messages and examples
