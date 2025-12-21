@@ -4,7 +4,8 @@
 
 ### 7. CLI mit Argumenten ✓
 - [x] Argparse für flexible Kommandozeilennutzung
-- [x] Verschiedene Modi (embed, search, status)
+- [x] Verschiedene Modi (embed, search, status, delete)
+- [x] Delete-Command mit Bestätigungsprompt und Force-Option
 - [x] Batch-Verarbeitung von Dokumenten
 - [x] Verzeichnis-Verarbeitung
 - [x] Überschreiben von .env-Einstellungen via CLI
@@ -12,8 +13,8 @@
 ### 5. Verschiedene Chunking-Strategien ✓
 - [x] Character-based chunking (original)
 - [x] Paragraph-based chunking
-- Semantisches Chunking (nach Absätzen/Sätzen)
-- Hierarchisches Chunking möglich als Erweiterung
+- [x] Semantisches Chunking (embedding-basiert mit konfigurierbarem Similarity Threshold)
+- [ ] Hierarchisches Chunking möglich als Erweiterung
 
 ### 4. Inkrementelle Updates ✓
 - [x] Prüfung ob Dokument bereits verarbeitet wurde (SHA256 hash)
