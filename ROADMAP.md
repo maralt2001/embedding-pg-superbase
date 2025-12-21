@@ -2,6 +2,13 @@
 
 ## Implemented Features ✓
 
+### 7. CLI mit Argumenten ✓
+- [x] Argparse für flexible Kommandozeilennutzung
+- [x] Verschiedene Modi (embed, search, status)
+- [x] Batch-Verarbeitung von Dokumenten
+- [x] Verzeichnis-Verarbeitung
+- [x] Überschreiben von .env-Einstellungen via CLI
+
 ### 5. Verschiedene Chunking-Strategien ✓
 - [x] Character-based chunking (original)
 - [x] Paragraph-based chunking
@@ -14,19 +21,20 @@
 - [x] Update-Strategie für modifizierte Dokumente
 - [x] Automatisches Löschen alter Chunks bei Änderungen
 
+### 1. Semantic Search / Query-Funktion ✓ (Teilweise)
+- [x] Möglichkeit, Fragen zu stellen und ähnliche Chunks zu finden
+- [x] Nutzt die bereits gespeicherten Embeddings für Ähnlichkeitssuche
+- [x] Ausgabe der relevantesten Textpassagen mit Scores
+- [x] Unterstützt sowohl Supabase als auch PostgreSQL
+- [x] Optimiert mit pgvector wenn verfügbar
+- [ ] Erweiterte Filterung und Ranking (für spätere Iteration)
+
 ## Planned Features
 
-### 1. Semantic Search / Query-Funktion
-- Möglichkeit, Fragen zu stellen und ähnliche Chunks zu finden
-- Nutzt die bereits gespeicherten Embeddings für Ähnlichkeitssuche
-- Ausgabe der relevantesten Textpassagen mit Scores
-- **Implementierungsaufwand**: Mittel
-- **Nutzen**: Hoch - macht die Embeddings nutzbar
-
-### 2. Batch-Verarbeitung
-- Mehrere Dokumente auf einmal verarbeiten (ganzer Ordner)
-- Progress-Bar für längere Prozesse
-- Zusammenfassendes Reporting
+### 2. Batch-Verarbeitung ✓ (Teilweise)
+- [x] Mehrere Dokumente auf einmal verarbeiten (ganzer Ordner)
+- [x] Zusammenfassendes Reporting
+- [ ] Progress-Bar für längere Prozesse
 - **Implementierungsaufwand**: Niedrig
 - **Nutzen**: Hoch - spart Zeit bei vielen Dokumenten
 
@@ -44,12 +52,6 @@
 - Quellenangaben in Antworten
 - **Implementierungsaufwand**: Mittel-Hoch
 - **Nutzen**: Sehr Hoch - vollständiges QA-System
-
-### 7. CLI mit Argumenten
-- Argparse für flexible Kommandozeilennutzung
-- Verschiedene Modi (embed, search, status)
-- **Implementierungsaufwand**: Niedrig
-- **Nutzen**: Mittel - bessere Usability
 
 ### 8. Logging & Monitoring
 - Strukturiertes Logging in Datei
@@ -80,14 +82,18 @@
 
 ## Prioritäten-Empfehlung
 
+### Completed ✓:
+1. ✓ **Batch-Verarbeitung** - macht das Tool viel praktischer
+2. ✓ **CLI mit Argumenten** - bessere Developer Experience
+3. ✓ **Semantic Search / Query-Funktion** - macht Embeddings nutzbar
+
 ### Quick Wins (geringer Aufwand, hoher Nutzen):
-1. **Batch-Verarbeitung** - macht das Tool viel praktischer
-2. **CLI mit Argumenten** - bessere Developer Experience
-3. **Logging & Monitoring** - hilfreich für Debugging
+1. **Progress-Bar für Batch-Verarbeitung** - besseres Feedback bei vielen Dokumenten
+2. **Logging & Monitoring** - hilfreich für Debugging
 
 ### High Impact (mittlerer Aufwand, sehr hoher Nutzen):
-1. **Semantic Search / Query-Funktion** - macht Embeddings nutzbar
-2. **RAG System** - vollständiges QA-System
+1. **RAG System** - vollständiges QA-System
+2. **Erweiterte Metadaten** - bessere Filterung und Organisation
 
 ### Nice to Have:
 1. Web-Interface - wenn GUI gewünscht

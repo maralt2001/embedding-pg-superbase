@@ -41,6 +41,34 @@ class StorageBackend(ABC):
         """
         pass
 
+    @abstractmethod
+    def search_similar_chunks(self, query_embedding: List[float], table_name: str, limit: int = 5) -> List[Dict]:
+        """
+        Search for similar chunks using cosine similarity
+
+        Args:
+            query_embedding: The embedding vector to search for
+            table_name: Table name
+            limit: Maximum number of results to return
+
+        Returns:
+            List of dicts with 'content', 'document_name', 'chunk_index', 'similarity'
+        """
+        pass
+
+    @abstractmethod
+    def get_all_documents(self, table_name: str) -> List[Dict]:
+        """
+        Get summary of all processed documents
+
+        Args:
+            table_name: Table name
+
+        Returns:
+            List of dicts with 'document_name', 'chunk_count', 'processed_at'
+        """
+        pass
+
 
 class SupabaseBackend(StorageBackend):
     """Supabase storage backend implementation"""
@@ -86,6 +114,59 @@ class SupabaseBackend(StorageBackend):
             return response
         except Exception as e:
             print(f"Error uploading to Supabase: {e}")
+            raise
+
+    def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
+        """Search for similar chunks using Supabase's vector similarity"""
+        try:
+            # Use Supabase RPC function for similarity search
+            response = self.client.rpc(
+                'match_documents',
+                {
+                    'query_embedding': query_embedding,
+                    'match_threshold': 0.0,
+                    'match_count': limit,
+                    'table_name': table_name
+                }
+            ).execute()
+
+            return response.data if response.data else []
+        except Exception as e:
+            print(f"Error searching chunks: {e}")
+            print("Note: Make sure you have created the match_documents function in Supabase")
+            print("See documentation for SQL function definition")
+            raise
+
+    def get_all_documents(self, table_name: str = "documents") -> List[Dict]:
+        """Get summary of all processed documents from Supabase"""
+        try:
+            # Group by document_name and get stats
+            response = self.client.table(table_name)\
+                .select("document_name, processed_at")\
+                .execute()
+
+            if not response.data:
+                return []
+
+            # Group documents manually since Supabase doesn't support GROUP BY in select
+            docs_map = {}
+            for row in response.data:
+                doc_name = row['document_name']
+                if doc_name not in docs_map:
+                    docs_map[doc_name] = {
+                        'document_name': doc_name,
+                        'chunk_count': 0,
+                        'processed_at': row['processed_at']
+                    }
+                docs_map[doc_name]['chunk_count'] += 1
+
+            # Convert to list and sort by processed_at
+            documents = list(docs_map.values())
+            documents.sort(key=lambda x: x['processed_at'], reverse=True)
+
+            return documents
+        except Exception as e:
+            print(f"Error fetching documents: {e}")
             raise
 
 
@@ -188,6 +269,115 @@ class PostgreSQLBackend(StorageBackend):
         except Exception as e:
             self.conn.rollback()
             print(f"Error uploading to PostgreSQL: {e}")
+            raise
+
+    def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
+        """Search for similar chunks using cosine similarity"""
+        try:
+            cursor = self.conn.cursor()
+
+            if self.has_pgvector:
+                # Set ivfflat.probes to search more lists for better recall
+                # This is especially important for small datasets or when using ivfflat indexes
+                # Using 50 to ensure good recall even with small datasets
+                cursor.execute("SET LOCAL ivfflat.probes = 50")
+
+                # Use pgvector's cosine distance operator
+                # Convert query_embedding to string representation for pgvector
+                embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
+                query = f"""
+                    SELECT
+                        content,
+                        document_name,
+                        chunk_index,
+                        1 - (embedding <=> %s::vector) as similarity
+                    FROM {table_name}
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                """
+                cursor.execute(query, (embedding_str, embedding_str, limit))
+            else:
+                # Manual cosine similarity calculation for REAL[] arrays
+                # Note: This is slower but works without pgvector
+                query = f"""
+                    WITH query_vec AS (
+                        SELECT %s::real[] as vec
+                    ),
+                    similarities AS (
+                        SELECT
+                            content,
+                            document_name,
+                            chunk_index,
+                            embedding,
+                            (
+                                -- Dot product
+                                (SELECT SUM(a * b)
+                                 FROM unnest(embedding) WITH ORDINALITY AS t1(a, i)
+                                 JOIN unnest((SELECT vec FROM query_vec)) WITH ORDINALITY AS t2(b, j)
+                                 ON t1.i = t2.j)
+                                /
+                                -- Magnitude product
+                                (
+                                    SQRT((SELECT SUM(a * a) FROM unnest(embedding) AS a)) *
+                                    SQRT((SELECT SUM(b * b) FROM unnest((SELECT vec FROM query_vec)) AS b))
+                                )
+                            ) as similarity
+                        FROM {table_name}
+                    )
+                    SELECT content, document_name, chunk_index, similarity
+                    FROM similarities
+                    ORDER BY similarity DESC
+                    LIMIT %s
+                """
+                cursor.execute(query, (query_embedding, limit))
+
+            rows = cursor.fetchall()
+            cursor.close()
+
+            # Convert to list of dicts
+            results = []
+            for row in rows:
+                results.append({
+                    'content': row[0],
+                    'document_name': row[1],
+                    'chunk_index': row[2],
+                    'similarity': float(row[3])
+                })
+
+            return results
+        except Exception as e:
+            print(f"Error searching chunks: {e}")
+            raise
+
+    def get_all_documents(self, table_name: str = "documents") -> List[Dict]:
+        """Get summary of all processed documents from PostgreSQL"""
+        try:
+            cursor = self.conn.cursor()
+            query = f"""
+                SELECT
+                    document_name,
+                    COUNT(*) as chunk_count,
+                    MAX(processed_at) as processed_at
+                FROM {table_name}
+                GROUP BY document_name
+                ORDER BY processed_at DESC
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            cursor.close()
+
+            # Convert to list of dicts
+            documents = []
+            for row in rows:
+                documents.append({
+                    'document_name': row[0],
+                    'chunk_count': row[1],
+                    'processed_at': row[2]
+                })
+
+            return documents
+        except Exception as e:
+            print(f"Error fetching documents: {e}")
             raise
 
     def close(self):

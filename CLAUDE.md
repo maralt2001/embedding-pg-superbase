@@ -59,6 +59,77 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### CLI Usage
+
+The project provides a comprehensive command-line interface via `cli.py` with three main commands:
+
+**1. Embed Documents** (process and generate embeddings)
+```bash
+# Process a single document
+python cli.py embed document.pdf
+
+# Process multiple documents
+python cli.py embed doc1.pdf doc2.docx doc3.txt
+
+# Process all documents in a directory
+python cli.py embed --directory ./documents
+
+# Force re-processing (skip incremental update check)
+python cli.py embed --force document.pdf
+
+# Custom chunking settings
+python cli.py embed --chunk-size 500 --strategy paragraph document.pdf
+python cli.py embed --overlap 100 --strategy character document.pdf
+```
+
+**2. Search for Similar Chunks** (semantic search)
+```bash
+# Basic search
+python cli.py search "What is Ansible?"
+
+# Search with custom result limit
+python cli.py search "configuration management" --limit 10
+
+# Search in specific table
+python cli.py search "deployment strategies" --table my_docs
+```
+
+**3. Show Document Status** (list processed documents)
+```bash
+# Show all processed documents
+python cli.py status
+
+# Show status for specific table
+python cli.py status --table my_docs
+```
+
+**Global Options** (apply to all commands):
+```bash
+# Override storage backend
+python cli.py --backend postgresql embed document.pdf
+python cli.py --backend supabase search "query"
+
+# Override table name
+python cli.py --table custom_table embed document.pdf
+
+# Custom LM Studio URL
+python cli.py --lm-studio-url http://192.168.1.100:1234/v1 embed document.pdf
+
+# Override database credentials (useful for CI/CD)
+python cli.py --postgres-host localhost --postgres-db mydb embed document.pdf
+```
+
+**Getting Help**:
+```bash
+# General help
+python cli.py --help
+
+# Command-specific help
+python cli.py embed --help
+python cli.py search --help
+python cli.py status --help
+```
+
 ### PostgreSQL Database Setup (if using PostgreSQL backend)
 
 1. **Create the database:**
@@ -121,12 +192,20 @@ python main.py
 - `process_document()`: Full pipeline method with incremental update support
 - Uses `StorageBackend` for all storage operations (backend-agnostic)
 
+**cli.py**
+- Command-line interface with argparse support
+- Three main commands: `embed`, `search`, `status`
+- Supports all configuration via CLI arguments or environment variables
+- Batch processing support (multiple files or directory)
+- Comprehensive help messages and examples
+
 **main.py**
-- Entry point that loads environment variables and processes documents
+- Legacy entry point that loads environment variables and processes documents
 - Configurable via environment variables for all major parameters
 - Handles storage backend selection and initialization
 - Handles skipped vs. processed document status
 - Example usage with error handling
+- Note: `cli.py` is recommended for new usage
 
 ### External Dependencies
 
@@ -226,3 +305,19 @@ All chunks include:
 - Document name and chunk index
 - File hash for change detection
 - Processing timestamp for audit trail
+
+### 5. Command-Line Interface
+Comprehensive CLI with argparse support:
+- **embed**: Process single/multiple documents or entire directories
+- **search**: Semantic search across all processed documents
+- **status**: View summary of all processed documents
+- All settings configurable via CLI arguments or environment variables
+- Batch processing with progress reporting
+
+### 6. Semantic Search
+Query your embedded documents using natural language:
+- Cosine similarity search using embeddings
+- Configurable result limits
+- Returns relevance scores and content previews
+- Works with both Supabase and PostgreSQL backends
+- Optimized with pgvector when available
