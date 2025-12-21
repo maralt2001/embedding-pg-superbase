@@ -156,19 +156,34 @@ The project includes a modern web-based interface built with FastAPI and vanilla
 
 **Start the Web Server:**
 ```bash
-# Default (runs on port 8000)
+# Development mode (default - localhost only, auto-reload enabled)
 python run.py
 
-# Or using uvicorn directly
+# Production mode (network accessible, multiple workers, no reload)
+ENVIRONMENT=production python run.py
+
+# Or set in .env file:
+# ENVIRONMENT=production
+# then just run:
+python run.py
+
+# Custom port (works in both environments)
+WEB_PORT=8080 python run.py
+
+# Override defaults with environment variables
+WEB_HOST=0.0.0.0 WEB_PORT=8080 python run.py
+```
+
+**Environment Modes:**
+- **Development** (default): Runs on `127.0.0.1:8000`, auto-reload enabled, debug logging, single worker
+- **Production**: Runs on `0.0.0.0:8000`, auto-reload disabled, info logging, 4 workers (configurable via `WEB_WORKERS`)
+
+**Direct uvicorn usage** (alternative to run.py):
+```bash
+# Development
 uvicorn backend.api.app:app --reload
 
-# Custom port
-uvicorn backend.api.app:app --reload --port 8080
-
-# Make accessible from network (0.0.0.0)
-uvicorn backend.api.app:app --host 0.0.0.0 --port 8000
-
-# Production mode (without reload)
+# Production
 uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
@@ -228,8 +243,28 @@ The web interface exposes the following REST API endpoints:
 
 **Environment Variables for Web Interface:**
 ```bash
+# Environment mode (development or production)
+ENVIRONMENT=development  # Optional: "development" (default) or "production"
+
+# Server configuration
+WEB_HOST=127.0.0.1  # Optional: Override default host (auto-configured based on ENVIRONMENT)
 WEB_PORT=8000  # Optional: Override default port
+WEB_WORKERS=4  # Optional: Number of worker processes in production (default: 4, ignored in development)
+WEB_RELOAD=true  # Optional: Override auto-reload setting (auto-configured based on ENVIRONMENT)
 ```
+
+**Environment-specific defaults:**
+- **Development mode** (`ENVIRONMENT=development` or not set):
+  - Host: `127.0.0.1` (localhost only)
+  - Reload: `true` (auto-reload on code changes)
+  - Workers: `1` (single process)
+  - Log level: `debug`
+
+- **Production mode** (`ENVIRONMENT=production`):
+  - Host: `0.0.0.0` (accessible from network)
+  - Reload: `false` (no auto-reload)
+  - Workers: `4` (multi-process for better performance)
+  - Log level: `info`
 
 All other configuration uses the same environment variables as the CLI (see Common Configuration section above).
 
@@ -357,8 +392,10 @@ python scripts/main.py
 
 **run.py**
 - Entry point for starting the web server
-- Loads configuration from environment variables
-- Configurable host, port, and reload settings
+- Supports development and production environments via `ENVIRONMENT` variable
+- Auto-configures host, port, workers, reload, and logging based on environment
+- Development: localhost only, auto-reload, debug logging, single worker
+- Production: network accessible, no reload, info logging, multi-worker
 - Delegates to uvicorn to run backend.api.app:app
 
 **scripts/main.py**
