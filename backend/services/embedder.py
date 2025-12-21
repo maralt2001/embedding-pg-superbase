@@ -5,7 +5,7 @@ import PyPDF2
 import docx
 import hashlib
 from datetime import datetime
-from storage_backends import StorageBackend, create_storage_backend
+from backend.storage.backends import StorageBackend, create_storage_backend
 
 class DocumentEmbedder:
     def __init__(self, lm_studio_url: str, storage_backend: StorageBackend = None, **backend_kwargs):

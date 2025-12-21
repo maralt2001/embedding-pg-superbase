@@ -65,89 +65,89 @@ pip install -r requirements.txt
 
 ### CLI Usage
 
-The project provides a comprehensive command-line interface via `cli.py` with four main commands:
+The project provides a comprehensive command-line interface via `scripts/cli.py` with four main commands:
 
 **1. Embed Documents** (process and generate embeddings)
 ```bash
 # Process a single document
-python cli.py embed document.pdf
+python scripts/cli.py embed document.pdf
 
 # Process multiple documents
-python cli.py embed doc1.pdf doc2.docx doc3.txt
+python scripts/cli.py embed doc1.pdf doc2.docx doc3.txt
 
 # Process all documents in a directory
-python cli.py embed --directory ./documents
+python scripts/cli.py embed --directory ./documents
 
 # Force re-processing (skip incremental update check)
-python cli.py embed --force document.pdf
+python scripts/cli.py embed --force document.pdf
 
 # Custom chunking settings
-python cli.py embed --chunk-size 500 --strategy paragraph document.pdf
-python cli.py embed --overlap 100 --strategy character document.pdf
+python scripts/cli.py embed --chunk-size 500 --strategy paragraph document.pdf
+python scripts/cli.py embed --overlap 100 --strategy character document.pdf
 
 # Semantic chunking with embedding similarity
-python cli.py embed --strategy semantic document.pdf
-python cli.py embed --strategy semantic --similarity-threshold 0.8 document.pdf
+python scripts/cli.py embed --strategy semantic document.pdf
+python scripts/cli.py embed --strategy semantic --similarity-threshold 0.8 document.pdf
 ```
 
 **2. Search for Similar Chunks** (semantic search)
 ```bash
 # Basic search
-python cli.py search "What is Ansible?"
+python scripts/cli.py search "What is Ansible?"
 
 # Search with custom result limit
-python cli.py search "configuration management" --limit 10
+python scripts/cli.py search "configuration management" --limit 10
 
 # Search in specific table
-python cli.py search "deployment strategies" --table my_docs
+python scripts/cli.py search "deployment strategies" --table my_docs
 ```
 
 **3. Show Document Status** (list processed documents)
 ```bash
 # Show all processed documents
-python cli.py status
+python scripts/cli.py status
 
 # Show status for specific table
-python cli.py status --table my_docs
+python scripts/cli.py status --table my_docs
 ```
 
 **4. Delete Documents** (remove a document and all its chunks)
 ```bash
 # Delete a document (with confirmation prompt)
-python cli.py delete document.pdf
+python scripts/cli.py delete document.pdf
 
 # Delete without confirmation
-python cli.py delete --force document.pdf
+python scripts/cli.py delete --force document.pdf
 
 # Delete from specific table
-python cli.py --table my_docs delete document.pdf
+python scripts/cli.py --table my_docs delete document.pdf
 ```
 
 **Global Options** (apply to all commands):
 ```bash
 # Override storage backend
-python cli.py --backend postgresql embed document.pdf
-python cli.py --backend supabase search "query"
+python scripts/cli.py --backend postgresql embed document.pdf
+python scripts/cli.py --backend supabase search "query"
 
 # Override table name
-python cli.py --table custom_table embed document.pdf
+python scripts/cli.py --table custom_table embed document.pdf
 
 # Custom LM Studio URL
-python cli.py --lm-studio-url http://192.168.1.100:1234/v1 embed document.pdf
+python scripts/cli.py --lm-studio-url http://192.168.1.100:1234/v1 embed document.pdf
 
 # Override database credentials (useful for CI/CD)
-python cli.py --postgres-host localhost --postgres-db mydb embed document.pdf
+python scripts/cli.py --postgres-host localhost --postgres-db mydb embed document.pdf
 ```
 
 **Getting Help**:
 ```bash
 # General help
-python cli.py --help
+python scripts/cli.py --help
 
 # Command-specific help
-python cli.py embed --help
-python cli.py search --help
-python cli.py status --help
+python scripts/cli.py embed --help
+python scripts/cli.py search --help
+python scripts/cli.py status --help
 ```
 
 ### Web Interface Usage
@@ -157,16 +157,19 @@ The project includes a modern web-based interface built with FastAPI and vanilla
 **Start the Web Server:**
 ```bash
 # Default (runs on port 8000)
-uvicorn web_app:app --reload
+python run.py
+
+# Or using uvicorn directly
+uvicorn backend.api.app:app --reload
 
 # Custom port
-uvicorn web_app:app --reload --port 8080
+uvicorn backend.api.app:app --reload --port 8080
 
 # Make accessible from network (0.0.0.0)
-uvicorn web_app:app --host 0.0.0.0 --port 8000
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000
 
 # Production mode (without reload)
-uvicorn web_app:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 **Access the Interface:**
@@ -286,16 +289,18 @@ psql -d embeddings_db -c "CREATE EXTENSION vector;"
 
 **Without pgvector:** The system automatically falls back to using `REAL[]` arrays. Similarity search will be slower but functional.
 
-### Run the Pipeline
+### Run the Legacy Pipeline Script
 ```bash
-python main.py
+python scripts/main.py
 ```
+
+**Note:** For new usage, the CLI (`python scripts/cli.py`) or web interface (`python run.py`) is recommended.
 
 ## Architecture
 
 ### Core Components
 
-**storage_backends.py**
+**backend/storage/backends.py**
 - `StorageBackend`: Abstract base class defining storage interface
 - `SupabaseBackend`: Implementation for Supabase cloud storage
 - `PostgreSQLBackend`: Implementation for local PostgreSQL storage
@@ -303,7 +308,7 @@ python main.py
   - Falls back to `REAL[]` arrays if pgvector not available
 - `create_storage_backend()`: Factory function for automatic backend selection
 
-**DocumentEmbedder (document_embedder.py)**
+**backend/services/embedder.py** (DocumentEmbedder)
 - Main class orchestrating the embedding pipeline
 - `read_document()`: Static method supporting PDF (PyPDF2), DOCX (python-docx), and TXT
 - `chunk_text()`: Splits text using configurable strategies (character, paragraph, or semantic-based)
@@ -313,48 +318,56 @@ python main.py
 - `_calculate_cosine_similarity()`: Static helper to calculate similarity between embedding vectors
 - `calculate_file_hash()`: Computes SHA256 hash for change detection
 - `get_embedding()`: Calls LM Studio API using model `text-embedding-nomic-embed-text-v1.5`
-- `process_document()`: Full pipeline method with incremental update support
+- `process_document()`: Full pipeline method with incremental update support and progress callbacks
 - Uses `StorageBackend` for all storage operations (backend-agnostic)
 
-**cli.py**
+**scripts/cli.py**
 - Command-line interface with argparse support
 - Four main commands: `embed`, `search`, `status`, `delete`
 - Supports all configuration via CLI arguments or environment variables
 - Batch processing support (multiple files or directory)
 - Comprehensive help messages and examples
 
-**web_app.py**
+**backend/api/app.py** (FastAPI application)
 - FastAPI web application providing REST API and web interface
 - API endpoints for upload, search, status, delete operations
+- Dynamic backend switching endpoint (PUT /api/config)
 - Background task processing for document uploads
 - In-memory task store for progress tracking
 - CORS middleware for development
 - Static file serving for frontend
 - Automatic cleanup of old tasks and uploaded files
 
-**web_service.py**
+**backend/services/web_service.py** (WebEmbeddingService)
 - Service layer wrapper around DocumentEmbedder for web interface
 - `WebEmbeddingService`: Provides progress tracking with callbacks
 - Updates task store at each processing stage
 - Handles file cleanup after processing
 - Maps progress stages: reading → chunking → embedding → uploading
 
-**static/** (Frontend assets)
+**frontend/static/** (Frontend assets)
 - `index.html`: Tab-based UI (Upload, Search, Documents, Settings)
 - `style.css`: Responsive design with gradient theme
 - `app.js`: Vanilla JavaScript for all UI interactions
   - File upload with drag & drop
   - Progress polling (1.5 second intervals)
   - Search and document management
+  - Backend switching functionality
   - Tab switching and UI state management
 
-**main.py**
+**run.py**
+- Entry point for starting the web server
+- Loads configuration from environment variables
+- Configurable host, port, and reload settings
+- Delegates to uvicorn to run backend.api.app:app
+
+**scripts/main.py**
 - Legacy entry point that loads environment variables and processes documents
 - Configurable via environment variables for all major parameters
 - Handles storage backend selection and initialization
 - Handles skipped vs. processed document status
 - Example usage with error handling
-- Note: `cli.py` or web interface is recommended for new usage
+- Note: `scripts/cli.py` or web interface (`run.py`) is recommended for new usage
 
 ### External Dependencies
 

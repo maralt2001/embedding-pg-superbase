@@ -5,11 +5,16 @@ Supports: embed, search, and status commands
 """
 import os
 import sys
-import argparse
 from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+import argparse
 from dotenv import load_dotenv
-from document_embedder import DocumentEmbedder
-from storage_backends import create_storage_backend
+from backend.services.embedder import DocumentEmbedder
+from backend.storage.backends import create_storage_backend
 
 load_dotenv()
 

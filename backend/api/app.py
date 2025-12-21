@@ -15,8 +15,8 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from document_embedder import DocumentEmbedder
-from web_service import WebEmbeddingService
+from backend.services.embedder import DocumentEmbedder
+from backend.services.web_service import WebEmbeddingService
 
 # Load environment variables
 load_dotenv()
@@ -159,7 +159,7 @@ def cleanup_old_tasks():
 @app.get("/")
 async def read_root():
     """Serve frontend HTML"""
-    return FileResponse("static/index.html")
+    return FileResponse("frontend/static/index.html")
 
 
 @app.get("/api/config")
@@ -403,7 +403,7 @@ async def search_documents(
 
 
 # Mount static files (must be after route definitions)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 
 if __name__ == "__main__":
