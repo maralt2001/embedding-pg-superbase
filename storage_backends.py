@@ -119,22 +119,25 @@ class SupabaseBackend(StorageBackend):
     def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
         """Search for similar chunks using Supabase's vector similarity"""
         try:
+            # Note: Supabase RPC functions work with fixed table names
+            # For custom tables, create separate functions (e.g., match_my_docs)
+            function_name = f'match_{table_name}' if table_name != 'documents' else 'match_documents'
+
             # Use Supabase RPC function for similarity search
             response = self.client.rpc(
-                'match_documents',
+                function_name,
                 {
                     'query_embedding': query_embedding,
                     'match_threshold': 0.0,
-                    'match_count': limit,
-                    'table_name': table_name
+                    'match_count': limit
                 }
             ).execute()
 
             return response.data if response.data else []
         except Exception as e:
             print(f"Error searching chunks: {e}")
-            print("Note: Make sure you have created the match_documents function in Supabase")
-            print("See documentation for SQL function definition")
+            print(f"Note: Make sure you have created the '{function_name}' function in Supabase")
+            print("See supabase_setup.sql for the SQL function definition")
             raise
 
     def get_all_documents(self, table_name: str = "documents") -> List[Dict]:
