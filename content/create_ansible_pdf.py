@@ -3,7 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 
 def create_ansible_pdf():
-    pdf_file = "ansible_info.pdf"
+    pdf_file = "created/ansible_info.pdf"
     c = canvas.Canvas(pdf_file, pagesize=A4)
     width, height = A4
 

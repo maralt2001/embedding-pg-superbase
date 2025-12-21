@@ -48,18 +48,24 @@ class DocumentEmbedder:
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
-    @staticmethod
-    def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200, strategy: str = "character") -> List[str]:
+    def chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200,
+                   strategy: str = "character", similarity_threshold: float = 0.75) -> List[str]:
         """
-        Split text into chunks with overlap
+        Split text into chunks with specified strategy
 
         Args:
             text: The text to chunk
             chunk_size: Size of each chunk in characters
-            overlap: Overlap between chunks in characters
-            strategy: Chunking strategy - "character" or "paragraph"
+            overlap: Overlap between chunks (only for character strategy)
+            strategy: Chunking strategy - "character", "paragraph", or "semantic"
+            similarity_threshold: Similarity threshold for semantic chunking (0.0-1.0)
+
+        Returns:
+            List of text chunks
         """
-        if strategy == "paragraph":
+        if strategy == "semantic":
+            return self._chunk_by_semantic(text, chunk_size, similarity_threshold)
+        elif strategy == "paragraph":
             return DocumentEmbedder._chunk_by_paragraph(text, chunk_size)
         else:
             # Character-based chunking (default)
@@ -150,6 +156,191 @@ class DocumentEmbedder:
         return chunks
 
     @staticmethod
+    def _calculate_cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+        """
+        Calculate cosine similarity between two vectors
+
+        Args:
+            vec1: First embedding vector
+            vec2: Second embedding vector
+
+        Returns:
+            Similarity score between -1 and 1 (higher = more similar)
+        """
+        if len(vec1) != len(vec2):
+            raise ValueError(f"Vectors must have same length: {len(vec1)} vs {len(vec2)}")
+
+        # Dot product
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+
+        # Magnitudes
+        magnitude1 = sum(a * a for a in vec1) ** 0.5
+        magnitude2 = sum(a * a for a in vec2) ** 0.5
+
+        # Avoid division by zero
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+
+        return dot_product / (magnitude1 * magnitude2)
+
+    @staticmethod
+    def _split_into_sentences(text: str) -> List[str]:
+        """
+        Split text into sentences using regex pattern
+
+        Handles:
+        - Standard sentence endings (. ! ?)
+        - Multiple punctuation (..., !!, etc.)
+        - Common abbreviations (Dr., Mr., Ms., etc.)
+
+        Args:
+            text: Text to split
+
+        Returns:
+            List of sentences (stripped and non-empty)
+        """
+        import re
+
+        # Replace common abbreviations to protect them
+        protected_text = text
+        abbreviations = [
+            (r'\bDr\.', 'Dr<dot>'),
+            (r'\bMr\.', 'Mr<dot>'),
+            (r'\bMrs\.', 'Mrs<dot>'),
+            (r'\bMs\.', 'Ms<dot>'),
+            (r'\bProf\.', 'Prof<dot>'),
+            (r'\betc\.', 'etc<dot>'),
+            (r'\bi\.e\.', 'i<dot>e<dot>'),
+            (r'\be\.g\.', 'e<dot>g<dot>'),
+        ]
+
+        for pattern, replacement in abbreviations:
+            protected_text = re.sub(pattern, replacement, protected_text)
+
+        # Split on sentence-ending punctuation followed by whitespace
+        # Pattern: . ! ? followed by space and capital letter OR end of string
+        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])\s*$'
+        sentences = re.split(sentence_pattern, protected_text)
+
+        # Restore abbreviations and clean up
+        result = []
+        for sentence in sentences:
+            # Restore protected dots
+            restored = sentence.replace('<dot>', '.')
+            cleaned = restored.strip()
+
+            # Only include non-empty sentences
+            if cleaned:
+                result.append(cleaned)
+
+        return result
+
+    def _chunk_by_semantic(self, text: str, max_chunk_size: int = 1000,
+                           similarity_threshold: float = 0.75) -> List[str]:
+        """
+        Split text into chunks based on semantic similarity
+
+        Uses embedding similarity to group consecutive sentences that are
+        semantically related, creating more coherent chunks.
+
+        Args:
+            text: Text to chunk
+            max_chunk_size: Maximum size of each chunk in characters
+            similarity_threshold: Minimum cosine similarity to merge sentences (0.0-1.0)
+
+        Returns:
+            List of semantically coherent text chunks
+        """
+        # Validate and clamp threshold
+        if not 0.0 <= similarity_threshold <= 1.0:
+            print(f"Warning: Similarity threshold {similarity_threshold} out of range, using 0.75")
+            similarity_threshold = max(0.0, min(1.0, similarity_threshold))
+
+        # Edge case: Very short text
+        if len(text) < 100:
+            return [text] if text.strip() else []
+
+        # Step 1: Split into sentences
+        sentences = self._split_into_sentences(text)
+
+        if not sentences:
+            return []
+
+        if len(sentences) == 1:
+            # Single sentence - split by size if needed
+            if len(sentences[0]) <= max_chunk_size:
+                return sentences
+            else:
+                # Fall back to character chunking for oversized single sentence
+                print(f"Warning: Single sentence exceeds max_chunk_size, splitting by characters")
+                chunks = []
+                sentence = sentences[0]
+                for i in range(0, len(sentence), max_chunk_size):
+                    chunks.append(sentence[i:i+max_chunk_size])
+                return chunks
+
+        # Step 2: Generate embeddings for all sentences
+        print(f"Generating embeddings for {len(sentences)} sentences...")
+        embeddings = []
+        valid_sentences = []
+
+        for i, sentence in enumerate(sentences, 1):
+            try:
+                if i % 50 == 0:  # Progress update every 50 sentences
+                    print(f"  Progress: {i}/{len(sentences)} sentences")
+
+                embedding = self.get_embedding(sentence)
+                embeddings.append(embedding)
+                valid_sentences.append(sentence)
+            except Exception as e:
+                print(f"Warning: Failed to get embedding for sentence {i}: {e}")
+                # Skip this sentence
+                continue
+
+        if not valid_sentences:
+            print("Error: No valid embeddings generated, falling back to character chunking")
+            chunks = []
+            for i in range(0, len(text), max_chunk_size):
+                chunks.append(text[i:i+max_chunk_size])
+            return chunks
+
+        # Step 3: Group sentences by similarity
+        chunks = []
+        current_chunk = [valid_sentences[0]]
+        current_size = len(valid_sentences[0])
+
+        for i in range(1, len(valid_sentences)):
+            sentence = valid_sentences[i]
+            sentence_size = len(sentence)
+
+            # Calculate similarity with previous sentence
+            similarity = self._calculate_cosine_similarity(
+                embeddings[i-1],
+                embeddings[i]
+            )
+
+            # Decide: merge or start new chunk
+            would_exceed = current_size + sentence_size + 1 > max_chunk_size  # +1 for space
+
+            if similarity >= similarity_threshold and not would_exceed:
+                # Merge into current chunk
+                current_chunk.append(sentence)
+                current_size += sentence_size + 1
+            else:
+                # Save current chunk and start new one
+                if current_chunk:
+                    chunks.append(' '.join(current_chunk))
+                current_chunk = [sentence]
+                current_size = sentence_size
+
+        # Don't forget the last chunk
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+
+        print(f"Created {len(chunks)} semantic chunks (avg similarity threshold: {similarity_threshold})")
+        return chunks
+
+    @staticmethod
     def calculate_file_hash(file_path: str) -> str:
         """
         Calculate SHA256 hash of a file
@@ -187,7 +378,7 @@ class DocumentEmbedder:
 
     def process_document(self, file_path: str, table_name: str = "documents",
                          chunk_size: int = 1000, overlap: int = 200, strategy: str = "character",
-                         skip_if_exists: bool = True):
+                         similarity_threshold: float = 0.75, skip_if_exists: bool = True):
         """
         Full pipeline: read document, chunk, embed, and upload
 
@@ -196,7 +387,8 @@ class DocumentEmbedder:
             table_name: Storage table name
             chunk_size: Size of text chunks
             overlap: Overlap between chunks (only used for character-based chunking)
-            strategy: Chunking strategy - "character" or "paragraph"
+            strategy: Chunking strategy - "character", "paragraph", or "semantic"
+            similarity_threshold: Similarity threshold for semantic chunking (0.0-1.0)
             skip_if_exists: If True, skip processing if document hash hasn't changed
         """
         file_path_obj = Path(file_path)
@@ -223,12 +415,14 @@ class DocumentEmbedder:
         print(f"Reading document: {file_path}")
         text = self.read_document(file_path)
 
-        if strategy == "paragraph":
+        if strategy == "semantic":
+            print(f"Chunking text by semantic similarity (threshold={similarity_threshold}, max_size={chunk_size})")
+        elif strategy == "paragraph":
             print(f"Chunking text by paragraphs (max_chunk_size={chunk_size})")
         else:
             print(f"Chunking text by characters (chunk_size={chunk_size}, overlap={overlap})")
 
-        chunks = self.chunk_text(text, chunk_size, overlap, strategy)
+        chunks = self.chunk_text(text, chunk_size, overlap, strategy, similarity_threshold)
         print(f"Created {len(chunks)} chunks")
 
         print("Generating embeddings...")

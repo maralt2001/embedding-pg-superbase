@@ -41,7 +41,8 @@ LM_STUDIO_URL=http://localhost:1234/v1  # Optional, defaults to this
 CHUNK_SIZE=1000  # Optional
 CHUNK_OVERLAP=200  # Optional (only used for character-based chunking)
 TABLE_NAME=documents  # Optional
-CHUNKING_STRATEGY=paragraph  # Optional: "character" or "paragraph" (default: "character")
+CHUNKING_STRATEGY=paragraph  # Optional: "character", "paragraph", or "semantic" (default: "character")
+SEMANTIC_SIMILARITY_THRESHOLD=0.75  # Optional: For semantic chunking (0.0-1.0, default: 0.75)
 SKIP_IF_EXISTS=true  # Optional: Skip unchanged documents (default: true)
 ```
 
@@ -80,6 +81,10 @@ python cli.py embed --force document.pdf
 # Custom chunking settings
 python cli.py embed --chunk-size 500 --strategy paragraph document.pdf
 python cli.py embed --overlap 100 --strategy character document.pdf
+
+# Semantic chunking with embedding similarity
+python cli.py embed --strategy semantic document.pdf
+python cli.py embed --strategy semantic --similarity-threshold 0.8 document.pdf
 ```
 
 **2. Search for Similar Chunks** (semantic search)
@@ -185,8 +190,11 @@ python main.py
 **DocumentEmbedder (document_embedder.py)**
 - Main class orchestrating the embedding pipeline
 - `read_document()`: Static method supporting PDF (PyPDF2), DOCX (python-docx), and TXT
-- `chunk_text()`: Splits text using configurable strategies (character or paragraph-based)
+- `chunk_text()`: Splits text using configurable strategies (character, paragraph, or semantic-based)
 - `_chunk_by_paragraph()`: Private method for paragraph-based chunking with intelligent splitting
+- `_chunk_by_semantic()`: Instance method for semantic chunking using embedding similarity
+- `_split_into_sentences()`: Static helper to split text into sentences (handles abbreviations)
+- `_calculate_cosine_similarity()`: Static helper to calculate similarity between embedding vectors
 - `calculate_file_hash()`: Computes SHA256 hash for change detection
 - `get_embedding()`: Calls LM Studio API using model `text-embedding-nomic-embed-text-v1.5`
 - `process_document()`: Full pipeline method with incremental update support
@@ -258,8 +266,9 @@ Document File → read_document() → chunk_text() →
 ## Key Implementation Details
 
 ### Chunking Strategies
-- **Character-based**: Fixed-size chunks with configurable overlap to preserve context across boundaries
-- **Paragraph-based**: Respects paragraph boundaries (\n\n), combines paragraphs up to max size, intelligently splits large paragraphs by sentences
+- **Character-based**: Fixed-size chunks with configurable overlap to preserve context across boundaries. Fast and predictable.
+- **Paragraph-based**: Respects paragraph boundaries (\n\n), combines paragraphs up to max size, intelligently splits large paragraphs by sentences. Preserves document structure.
+- **Semantic**: Groups sentences by embedding similarity to create semantically coherent chunks. Uses LM Studio API to generate embeddings for each sentence, then merges consecutive sentences when cosine similarity exceeds threshold (default: 0.75). Highest quality but slowest (requires N+1 API calls for N sentences). Best for documents where semantic coherence is critical for retrieval quality.
 
 ### Incremental Updates
 - SHA256 file hashing for change detection
@@ -291,7 +300,12 @@ Choose between Supabase (cloud) or PostgreSQL (local):
 - Both use identical table schema for easy migration
 
 ### 2. Multiple Chunking Strategies
-Set `CHUNKING_STRATEGY=paragraph` for natural document structure preservation, or `character` for consistent chunk sizes with overlap.
+Choose the chunking strategy that best fits your needs:
+- **`character`**: Fast, fixed-size chunks with overlap (default)
+- **`paragraph`**: Medium speed, respects paragraph boundaries
+- **`semantic`**: Slow, highest quality - groups sentences by embedding similarity
+
+Set via `CHUNKING_STRATEGY` environment variable or `--strategy` CLI argument. For semantic chunking, adjust `SEMANTIC_SIMILARITY_THRESHOLD` (0.0-1.0, default: 0.75) to control how strictly sentences must match to be grouped together.
 
 ### 3. Incremental Updates
 Set `SKIP_IF_EXISTS=true` to automatically skip unchanged documents. The system:

@@ -61,6 +61,7 @@ def cmd_embed(args):
     overlap = args.overlap or int(os.getenv("CHUNK_OVERLAP", 200))
     table_name = args.table or os.getenv("TABLE_NAME", "documents")
     chunking_strategy = args.strategy or os.getenv("CHUNKING_STRATEGY", "character")
+    similarity_threshold = args.similarity_threshold or float(os.getenv("SEMANTIC_SIMILARITY_THRESHOLD", "0.75"))
     skip_if_exists = not args.force  # Force flag overrides skip behavior
 
     # Handle multiple documents or directory
@@ -92,6 +93,8 @@ def cmd_embed(args):
     print(f"  Chunk size: {chunk_size}")
     print(f"  Overlap: {overlap}")
     print(f"  Chunking strategy: {chunking_strategy}")
+    if chunking_strategy == "semantic":
+        print(f"  Similarity threshold: {similarity_threshold}")
     print(f"  Skip unchanged: {skip_if_exists}")
     print(f"  Files to process: {len(file_paths)}\n")
 
@@ -110,6 +113,7 @@ def cmd_embed(args):
                 chunk_size=chunk_size,
                 overlap=overlap,
                 strategy=chunking_strategy,
+                similarity_threshold=similarity_threshold,
                 skip_if_exists=skip_if_exists
             )
 
@@ -274,8 +278,10 @@ Examples:
     embed_parser.add_argument('-d', '--directory', help='Process all supported files in directory')
     embed_parser.add_argument('--chunk-size', type=int, help='Chunk size in characters')
     embed_parser.add_argument('--overlap', type=int, help='Overlap between chunks')
-    embed_parser.add_argument('--strategy', choices=['character', 'paragraph'],
+    embed_parser.add_argument('--strategy', choices=['character', 'paragraph', 'semantic'],
                              help='Chunking strategy (default: character)')
+    embed_parser.add_argument('--similarity-threshold', type=float,
+                             help='Similarity threshold for semantic chunking (0.0-1.0, default: 0.75)')
     embed_parser.add_argument('--force', action='store_true',
                              help='Force re-processing even if document unchanged')
 
