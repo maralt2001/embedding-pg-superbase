@@ -278,7 +278,7 @@ All other configuration uses the same environment variables as the CLI (see Comm
 
 3. **Create the documents table and search function:**
    - Go to SQL Editor in your Supabase dashboard
-   - Run the SQL script from `supabase_setup.sql`
+   - Run the SQL script from `scripts/supabase_setup.sql`
    - This creates the `match_documents()` function for similarity search
 
 4. **Get your credentials:**
@@ -287,7 +287,7 @@ All other configuration uses the same environment variables as the CLI (see Comm
    - Copy your anon/public key (SUPABASE_KEY)
    - Add them to your `.env` file
 
-**Note:** Supabase functions work with fixed table names. If you need custom table names, create separate functions (see `supabase_setup.sql` for examples).
+**Note:** Supabase functions work with fixed table names. If you need custom table names, create separate functions (see `scripts/supabase_setup.sql` for examples).
 
 ### PostgreSQL Database Setup (if using PostgreSQL backend)
 

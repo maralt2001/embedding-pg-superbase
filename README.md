@@ -23,12 +23,14 @@ A comprehensive document embedding pipeline with CLI and web interface for proce
 │
 ├── scripts/                    # Utility scripts
 │   ├── cli.py                # Command-line interface
-│   └── main.py               # Legacy example script
+│   ├── main.py               # Legacy example script
+│   └── supabase_setup.sql    # Supabase database setup script
 │
 ├── uploads/                    # Temporary file uploads (gitignored)
 ├── run.py                      # Web server entry point
 ├── requirements.txt            # Python dependencies
 ├── .env                        # Configuration (not in git)
+├── .env.example                # Example configuration file
 ├── CLAUDE.md                   # Claude Code documentation
 └── ROADMAP.md                  # Feature roadmap
 ```
@@ -45,9 +47,12 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-Create a `.env` file with your configuration:
+Create a `.env` file with your configuration (you can copy from `.env.example`):
 
 ```bash
+# Environment (development or production)
+ENVIRONMENT=development
+
 # Storage Backend (postgresql or supabase)
 STORAGE_BACKEND=postgresql
 
@@ -65,6 +70,11 @@ POSTGRES_PASSWORD=your_password
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
 
+# Web Server (optional overrides)
+WEB_PORT=8000
+# WEB_HOST=127.0.0.1  # Auto-configured based on ENVIRONMENT
+# WEB_WORKERS=4       # Production only
+
 # Processing settings
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
@@ -75,11 +85,17 @@ SKIP_IF_EXISTS=true
 
 ### 3. Run Web Interface
 
+**Development mode** (localhost only, auto-reload):
 ```bash
 python run.py
 ```
 
-Then open http://localhost:8000 in your browser.
+**Production mode** (network accessible, multi-worker):
+```bash
+ENVIRONMENT=production python run.py
+```
+
+Then open http://localhost:8000 in your browser (or http://your-server-ip:8000 in production).
 
 ### 4. Use CLI
 
@@ -99,6 +115,7 @@ python scripts/cli.py delete document.pdf
 
 ## Features
 
+- **Production Ready**: Environment-based configuration (development/production modes)
 - **Multiple Storage Backends**: PostgreSQL (default) or Supabase
 - **Web Interface**: Modern UI with drag & drop upload, search, and management
 - **Dynamic Backend Switching**: Change between PostgreSQL and Supabase without restart
@@ -121,15 +138,23 @@ See [CLAUDE.md](CLAUDE.md) for comprehensive documentation.
 ## Development
 
 ```bash
-# Start web server with auto-reload
+# Development mode (auto-reload enabled)
 python run.py
 
+# Production mode
+ENVIRONMENT=production python run.py
+
 # Or using uvicorn directly
-uvicorn backend.api.app:app --reload
+uvicorn backend.api.app:app --reload  # Development
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --workers 4  # Production
 
 # Run CLI
 python scripts/cli.py --help
 ```
+
+**Environment Modes:**
+- **Development**: `127.0.0.1:8000`, auto-reload, debug logging, 1 worker
+- **Production**: `0.0.0.0:8000`, no reload, info logging, 4 workers
 
 ## License
 
