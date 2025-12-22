@@ -402,6 +402,129 @@ async def search_documents(
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
+@app.post("/api/chat")
+async def chat_with_documents(
+    query: str = Query(..., description="User question"),
+    limit: int = Query(5, ge=1, le=20, description="Number of context chunks to retrieve")
+):
+    """
+    Chat with documents using RAG (Retrieval Augmented Generation) with streaming
+
+    Retrieves relevant chunks and uses LLM to answer based on context
+    """
+    if not query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+
+    try:
+        import requests
+        import json
+        from fastapi.responses import StreamingResponse
+
+        table_name = config["table_name"]
+
+        # Get embedding for query
+        query_embedding = embedder.get_embedding(query)
+
+        # Search similar chunks
+        results = embedder.storage.search_similar_chunks(
+            query_embedding=query_embedding,
+            table_name=table_name,
+            limit=limit
+        )
+
+        # Build context from results
+        if not results:
+            context = "No relevant documents found."
+            sources = []
+        else:
+            context_parts = []
+            sources = []
+            for i, result in enumerate(results, 1):
+                context_parts.append(f"[Document {i}: {result['document_name']}]\n{result['content']}")
+                sources.append({
+                    "document_name": result["document_name"],
+                    "chunk_index": result.get("chunk_index", 0),
+                    "similarity": result.get("similarity", 0)
+                })
+            context = "\n\n".join(context_parts)
+
+        # Construct prompt
+        system_prompt = """You are a helpful assistant that answers questions based on the provided document context.
+If the answer cannot be found in the context, say so clearly. Always base your answers on the provided documents."""
+
+        user_prompt = f"""Context from documents:
+{context}
+
+Question: {query}
+
+Please provide a detailed answer based on the context above."""
+
+        # Stream generator function
+        def generate_stream():
+            try:
+                # First send sources as metadata
+                yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+
+                # Call LM Studio chat completion with streaming
+                lm_studio_url = config["lm_studio_url"]
+                chat_url = lm_studio_url.replace("/v1", "") + "/v1/chat/completions"
+
+                response = requests.post(
+                    chat_url,
+                    json={
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 1000,
+                        "stream": True
+                    },
+                    stream=True,
+                    timeout=60
+                )
+
+                if response.status_code != 200:
+                    yield f"data: {json.dumps({'type': 'error', 'error': f'LM Studio returned status {response.status_code}'})}\n\n"
+                    return
+
+                # Stream the response
+                for line in response.iter_lines():
+                    if line:
+                        line_text = line.decode('utf-8')
+                        if line_text.startswith('data: '):
+                            data_str = line_text[6:]  # Remove 'data: ' prefix
+                            if data_str.strip() == '[DONE]':
+                                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                                break
+                            try:
+                                data = json.loads(data_str)
+                                if 'choices' in data and len(data['choices']) > 0:
+                                    delta = data['choices'][0].get('delta', {})
+                                    if 'content' in delta:
+                                        content = delta['content']
+                                        yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
+                            except json.JSONDecodeError:
+                                continue
+
+            except requests.exceptions.ConnectionError:
+                yield f"data: {json.dumps({'type': 'error', 'error': 'Chat server unavailable. Please ensure LM Studio is running with a chat model loaded.'})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
 # Mount static files (must be after route definitions)
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 

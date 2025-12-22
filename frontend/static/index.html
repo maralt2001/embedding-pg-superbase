@@ -16,16 +16,19 @@
         <!-- Tab navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="upload">
-                <span>📤</span> Upload
+                <span>↑</span> Upload
             </button>
             <button class="tab-btn" data-tab="search">
-                <span>🔍</span> Search
+                <span>⌕</span> Search
+            </button>
+            <button class="tab-btn" data-tab="chat">
+                <span>💬</span> Chat
             </button>
             <button class="tab-btn" data-tab="documents">
-                <span>📚</span> Documents
+                <span>≡</span> Documents
             </button>
             <button class="tab-btn" data-tab="settings">
-                <span>⚙️</span> Settings
+                <span>⚙</span> Settings
             </button>
         </div>
 
@@ -36,7 +39,7 @@
                 <p class="info-text">Supported formats: PDF, DOCX, TXT (max 50MB)</p>
 
                 <div class="upload-zone" id="dropZone">
-                    <div class="upload-icon">📄</div>
+                    <div class="upload-icon">▢</div>
                     <p>Drag & drop file here or click to browse</p>
                     <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display: none;">
                     <button type="button" class="btn btn-primary" id="browseBtn">Choose File</button>
@@ -83,13 +86,44 @@
             </div>
         </div>
 
+        <!-- Chat tab -->
+        <div id="chat-tab" class="tab-content">
+            <div class="card">
+                <h2>Chat with Documents</h2>
+                <p class="info-text">Ask questions and get answers based on your embedded documents</p>
+
+                <div class="chat-controls">
+                    <button id="clearChatBtn" class="btn btn-secondary">Clear Chat</button>
+                </div>
+
+                <div id="chatMessages" class="chat-messages">
+                    <div class="chat-message assistant">
+                        <div class="message-avatar">AI</div>
+                        <div class="message-content">
+                            <p>Hello! I'm ready to answer questions about your documents. What would you like to know?</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <input
+                        type="text"
+                        id="chatInput"
+                        class="chat-input"
+                        placeholder="Ask a question about your documents..."
+                    >
+                    <button id="sendChatBtn" class="btn btn-primary chat-send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Documents tab -->
         <div id="documents-tab" class="tab-content">
             <div class="card">
                 <h2>Processed Documents</h2>
                 <p class="info-text">View and manage all your embedded documents</p>
 
-                <button id="refreshDocumentsBtn" class="btn btn-secondary">🔄 Refresh</button>
+                <button id="refreshDocumentsBtn" class="btn btn-secondary">↻ Refresh</button>
 
                 <div id="documentsContainer" class="documents-container">
                     <div class="loading">Loading documents...</div>

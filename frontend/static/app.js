@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeTabs();
     initializeUpload();
     initializeSearch();
+    initializeChat();
     initializeDocuments();
     initializeSettings();
 });
@@ -347,6 +348,297 @@ function displaySearchResults(results) {
 }
 
 // ============================================================================
+// Chat
+// ============================================================================
+
+function initializeChat() {
+    const sendBtn = document.getElementById('sendChatBtn');
+    const chatInput = document.getElementById('chatInput');
+    const clearBtn = document.getElementById('clearChatBtn');
+
+    console.log('Initializing chat...', { sendBtn, chatInput, clearBtn });
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', () => {
+            console.log('Send button clicked');
+            sendChatMessage();
+        });
+    } else {
+        console.error('Send button not found!');
+    }
+
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                console.log('Enter key pressed');
+                sendChatMessage();
+            }
+        });
+    } else {
+        console.error('Chat input not found!');
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearChat);
+    } else {
+        console.error('Clear button not found!');
+    }
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const query = input.value.trim();
+
+    if (!query) {
+        return;
+    }
+
+    // Add user message
+    addChatMessage('user', query);
+
+    // Clear input
+    input.value = '';
+
+    // Add streaming assistant message
+    const messageId = addStreamingMessage();
+
+    // Scroll to bottom
+    scrollToBottom();
+
+    try {
+        const response = await fetch(`/api/chat?query=${encodeURIComponent(query)}&limit=5`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error('Chat request failed');
+        }
+
+        // Read the stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let sources = null;
+        let fullContent = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            // Decode the chunk
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Keep incomplete line in buffer
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6);
+                    try {
+                        const data = JSON.parse(dataStr);
+
+                        if (data.type === 'sources') {
+                            sources = data.sources;
+                        } else if (data.type === 'content') {
+                            fullContent += data.content;
+                            updateStreamingMessage(messageId, fullContent, sources);
+                            scrollToBottom();
+                        } else if (data.type === 'done') {
+                            // Streaming complete
+                            finalizeStreamingMessage(messageId, fullContent, sources);
+                        } else if (data.type === 'error') {
+                            throw new Error(data.error);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse SSE data:', e);
+                    }
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Chat error:', error);
+        removeStreamingMessage(messageId);
+        addChatMessage('assistant', `Sorry, I encountered an error: ${error.message}`);
+        scrollToBottom();
+    }
+}
+
+function addChatMessage(role, content, sources = null) {
+    const messagesDiv = document.getElementById('chatMessages');
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = role === 'user' ? 'You' : 'AI';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.innerHTML = formatMessageContent(content);
+    contentDiv.appendChild(textDiv);
+
+    // Add sources if available
+    if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'message-sources';
+
+        const sourcesTitle = document.createElement('div');
+        sourcesTitle.className = 'message-sources-title';
+        sourcesTitle.textContent = 'Sources:';
+        sourcesDiv.appendChild(sourcesTitle);
+
+        // Group sources by document name and keep highest similarity
+        const uniqueSources = {};
+        sources.forEach(source => {
+            const docName = source.document_name;
+            if (!uniqueSources[docName] || source.similarity > uniqueSources[docName].similarity) {
+                uniqueSources[docName] = source;
+            }
+        });
+
+        // Display unique sources
+        Object.values(uniqueSources).forEach(source => {
+            const sourceItem = document.createElement('div');
+            sourceItem.className = 'source-item';
+
+            const similarity = (source.similarity * 100).toFixed(1);
+            sourceItem.innerHTML = `
+                <span class="source-name">${escapeHtml(source.document_name)}</span>
+                <span class="source-similarity"> (${similarity}% match)</span>
+            `;
+
+            sourcesDiv.appendChild(sourceItem);
+        });
+
+        contentDiv.appendChild(sourcesDiv);
+    }
+
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentDiv);
+    messagesDiv.appendChild(messageDiv);
+}
+
+function addStreamingMessage() {
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageId = `streaming-${Date.now()}`;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message assistant';
+    messageDiv.id = messageId;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = 'AI';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.innerHTML = '<span class="typing-cursor">▋</span>';
+
+    contentDiv.appendChild(textDiv);
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentDiv);
+    messagesDiv.appendChild(messageDiv);
+
+    return messageId;
+}
+
+function updateStreamingMessage(messageId, content, sources) {
+    const messageDiv = document.getElementById(messageId);
+    if (!messageDiv) return;
+
+    const textDiv = messageDiv.querySelector('.message-text');
+    if (textDiv) {
+        textDiv.innerHTML = formatMessageContent(content) + '<span class="typing-cursor">▋</span>';
+    }
+}
+
+function finalizeStreamingMessage(messageId, content, sources) {
+    const messageDiv = document.getElementById(messageId);
+    if (!messageDiv) return;
+
+    const contentDiv = messageDiv.querySelector('.message-content');
+    const textDiv = messageDiv.querySelector('.message-text');
+
+    // Remove cursor
+    if (textDiv) {
+        textDiv.innerHTML = formatMessageContent(content);
+    }
+
+    // Add sources if available
+    if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement('div');
+        sourcesDiv.className = 'message-sources';
+
+        const sourcesTitle = document.createElement('div');
+        sourcesTitle.className = 'message-sources-title';
+        sourcesTitle.textContent = 'Sources:';
+        sourcesDiv.appendChild(sourcesTitle);
+
+        // Group sources by document name and keep highest similarity
+        const uniqueSources = {};
+        sources.forEach(source => {
+            const docName = source.document_name;
+            if (!uniqueSources[docName] || source.similarity > uniqueSources[docName].similarity) {
+                uniqueSources[docName] = source;
+            }
+        });
+
+        // Display unique sources
+        Object.values(uniqueSources).forEach(source => {
+            const sourceItem = document.createElement('div');
+            sourceItem.className = 'source-item';
+
+            const similarity = (source.similarity * 100).toFixed(1);
+            sourceItem.innerHTML = `
+                <span class="source-name">${escapeHtml(source.document_name)}</span>
+                <span class="source-similarity"> (${similarity}% match)</span>
+            `;
+
+            sourcesDiv.appendChild(sourceItem);
+        });
+
+        contentDiv.appendChild(sourcesDiv);
+    }
+}
+
+function removeStreamingMessage(messageId) {
+    const messageDiv = document.getElementById(messageId);
+    if (messageDiv) {
+        messageDiv.remove();
+    }
+}
+
+function clearChat() {
+    const messagesDiv = document.getElementById('chatMessages');
+    messagesDiv.innerHTML = `
+        <div class="chat-message assistant">
+            <div class="message-avatar">AI</div>
+            <div class="message-content">
+                <p>Hello! I'm ready to answer questions about your documents. What would you like to know?</p>
+            </div>
+        </div>
+    `;
+}
+
+function scrollToBottom() {
+    const messagesDiv = document.getElementById('chatMessages');
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// ============================================================================
 // Documents Management
 // ============================================================================
 
@@ -572,4 +864,34 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function formatMessageContent(content) {
+    // Escape HTML first
+    let formatted = escapeHtml(content);
+
+    // Convert markdown-style formatting
+    // Bold: **text** or __text__
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    // Italic: *text* or _text_
+    formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Code: `code`
+    formatted = formatted.replace(/`(.+?)`/g, '<code>$1</code>');
+
+    // Line breaks: preserve \n as <br>
+    formatted = formatted.replace(/\n/g, '<br>');
+
+    // Lists: convert - or * at start of line to bullets
+    formatted = formatted.replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>');
+
+    // Wrap consecutive list items in <ul>
+    formatted = formatted.replace(/(<li>.*<\/li>(?:<br>)?)+/g, (match) => {
+        return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
+    });
+
+    return formatted;
 }
