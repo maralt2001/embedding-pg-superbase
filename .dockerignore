@@ -1,0 +1,58 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+.env.example
+.env.local
+.env.*.local
+
+# Documentation (optional)
+README.md
+ROADMAP.md
+CLAUDE.md
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Runtime directories
+uploads/
+content/
+
+# Database setup scripts
+scripts/db_setup.sql
+scripts/db_setup_no_pgvector.sql
+scripts/supabase_setup.sql
+
+# macOS
+.DS_Store
+
+# Tests
+tests/
+test_*.py
+*_test.py

@@ -870,6 +870,9 @@ function formatMessageContent(content) {
     // Escape HTML first
     let formatted = escapeHtml(content);
 
+    // Convert Markdown tables to HTML tables BEFORE converting newlines
+    formatted = formatMarkdownTables(formatted);
+
     // Convert markdown-style formatting
     // Bold: **text** or __text__
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -894,4 +897,59 @@ function formatMessageContent(content) {
     });
 
     return formatted;
+}
+
+function formatMarkdownTables(text) {
+    // Match Markdown tables: | header | header |\n|-------|-------|\n| cell | cell |
+    const tableRegex = /(\|.+\|\n)+/g;
+
+    return text.replace(tableRegex, (tableText) => {
+        const lines = tableText.trim().split('\n');
+        if (lines.length < 2) return tableText;
+
+        // Check if second line is separator (contains only |, -, and spaces)
+        if (!/^[\|\-\s:]+$/.test(lines[1])) return tableText;
+
+        const headerLine = lines[0];
+        const separatorLine = lines[1];
+        const bodyLines = lines.slice(2);
+
+        // Parse header
+        const headers = headerLine.split('|')
+            .map(h => h.trim())
+            .filter(h => h.length > 0);
+
+        // Parse body rows
+        const rows = bodyLines.map(line =>
+            line.split('|')
+                .map(cell => cell.trim())
+                .filter(cell => cell.length > 0)
+        );
+
+        // Build HTML table
+        let html = '<table class="markdown-table">';
+
+        // Add header
+        html += '<thead><tr>';
+        headers.forEach(header => {
+            html += `<th>${header}</th>`;
+        });
+        html += '</tr></thead>';
+
+        // Add body
+        html += '<tbody>';
+        rows.forEach(row => {
+            if (row.length > 0) {
+                html += '<tr>';
+                row.forEach(cell => {
+                    html += `<td>${cell}</td>`;
+                });
+                html += '</tr>';
+            }
+        });
+        html += '</tbody>';
+        html += '</table>';
+
+        return html;
+    });
 }

@@ -113,9 +113,142 @@ python scripts/cli.py status
 python scripts/cli.py delete document.pdf
 ```
 
+## Docker Deployment
+
+The application includes production-ready Docker support with multi-stage builds for optimal image size and security.
+
+### Quick Start with Docker Compose (Recommended)
+
+1. **Edit `docker-compose.yml`** with your configuration:
+   ```yaml
+   environment:
+     - POSTGRES_HOST=your-postgres-host
+     - POSTGRES_DB=embeddings_db
+     - POSTGRES_PASSWORD=your-password
+     - LM_STUDIO_URL=http://host.docker.internal:1234/v1
+   ```
+
+2. **Start the application**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Access the web interface**:
+   ```
+   http://localhost:8000
+   ```
+
+4. **View logs**:
+   ```bash
+   docker-compose logs -f
+   ```
+
+5. **Stop the application**:
+   ```bash
+   docker-compose down
+   ```
+
+### Manual Docker Build & Run
+
+**Build the image**:
+```bash
+docker build -t embedding-pipeline:latest .
+```
+
+**Run with PostgreSQL**:
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v ./uploads:/app/uploads \
+  -e STORAGE_BACKEND=postgresql \
+  -e POSTGRES_HOST=your-host \
+  -e POSTGRES_DB=embeddings_db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=your-password \
+  -e LM_STUDIO_URL=http://host.docker.internal:1234/v1 \
+  --name embedding-pipeline \
+  embedding-pipeline:latest
+```
+
+**Run with Supabase**:
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v ./uploads:/app/uploads \
+  -e STORAGE_BACKEND=supabase \
+  -e SUPABASE_URL=https://your-project.supabase.co \
+  -e SUPABASE_KEY=your-key \
+  -e LM_STUDIO_URL=http://host.docker.internal:1234/v1 \
+  --name embedding-pipeline \
+  embedding-pipeline:latest
+```
+
+### Docker Image Details
+
+- **Base Image**: `python:3.11-slim-bookworm`
+- **Image Size**: ~484MB (optimized multi-stage build)
+- **Security**: Runs as non-root user (`appuser`)
+- **Production Config**: 4 workers, runs on `0.0.0.0:8000`
+- **Health Check**: Automatic health monitoring every 30s
+- **Volumes**: `/app/uploads` for persistent file storage
+
+### Configuration Notes
+
+**LM Studio URL:**
+- **Mac/Windows**: Use `http://host.docker.internal:1234/v1` (accesses host machine)
+- **Linux**: Use `http://172.17.0.1:1234/v1` or your host IP
+
+**Storage Options:**
+- **Remote PostgreSQL**: Set `POSTGRES_HOST` to your database server
+- **Supabase**: Set `STORAGE_BACKEND=supabase` with Supabase credentials
+- **Local PostgreSQL**: Uncomment the postgres service in `docker-compose.yml`
+
+### Common Docker Commands
+
+```bash
+# Check container status
+docker ps
+docker-compose ps
+
+# View logs
+docker logs embedding-pipeline
+docker-compose logs -f embedding-pipeline
+
+# Restart container
+docker restart embedding-pipeline
+docker-compose restart
+
+# Stop and remove
+docker rm -f embedding-pipeline
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+
+# Access container shell (for debugging)
+docker exec -it embedding-pipeline /bin/bash
+```
+
+### Troubleshooting
+
+**Can't connect to PostgreSQL:**
+- Verify `POSTGRES_HOST` is accessible from the container
+- Check firewall rules allow connection on port 5432
+- Test: `docker-compose exec embedding-pipeline ping your-postgres-host`
+
+**Can't connect to LM Studio:**
+- Ensure LM Studio is running with API server enabled
+- Use `host.docker.internal` (Mac/Windows) or `172.17.0.1` (Linux)
+- Test: `docker-compose exec embedding-pipeline curl http://host.docker.internal:1234/v1/models`
+
+**Permission errors:**
+- The container runs as user `appuser` (UID 1000)
+- Ensure the `uploads/` volume mount has proper permissions
+
 ## Features
 
 - **Production Ready**: Environment-based configuration (development/production modes)
+- **Docker Support**: Multi-stage builds, docker-compose, health checks
 - **Multiple Storage Backends**: PostgreSQL (default) or Supabase
 - **Web Interface**: Modern UI with drag & drop upload, search, and management
 - **Dynamic Backend Switching**: Change between PostgreSQL and Supabase without restart

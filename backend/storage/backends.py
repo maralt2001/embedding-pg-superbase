@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class StorageBackend(ABC):
@@ -223,9 +226,9 @@ class PostgreSQLBackend(StorageBackend):
         self.has_pgvector = self._check_pgvector_extension()
 
         if self.has_pgvector:
-            print("PostgreSQL backend initialized with pgvector support")
+            logger.debug("PostgreSQL backend initialized with pgvector support")
         else:
-            print("PostgreSQL backend initialized without pgvector (using REAL[] arrays)")
+            logger.debug("PostgreSQL backend initialized without pgvector (using REAL[] arrays)")
 
     def _check_pgvector_extension(self) -> bool:
         """Check if pgvector extension is available"""
@@ -240,7 +243,7 @@ class PostgreSQLBackend(StorageBackend):
             cursor.close()
             return result
         except Exception as e:
-            print(f"Error checking pgvector extension: {e}")
+            logger.warning(f"Error checking pgvector extension: {e}")
             return False
 
     def check_document_exists(self, document_name: str, table_name: str = "documents") -> Optional[str]:
@@ -465,7 +468,7 @@ def create_storage_backend(**kwargs) -> StorageBackend:
         if not supabase_url or not supabase_key:
             raise ValueError("Supabase backend requires SUPABASE_URL and SUPABASE_KEY")
 
-        print(f"Using Supabase storage backend")
+        logger.debug(f"Initializing Supabase backend")
         return SupabaseBackend(
             supabase_url=supabase_url,
             supabase_key=supabase_key
@@ -485,7 +488,7 @@ def create_storage_backend(**kwargs) -> StorageBackend:
                 "POSTGRES_USER, and POSTGRES_PASSWORD"
             )
 
-        print(f"Using PostgreSQL storage backend (host={postgres_host}, db={postgres_db})")
+        logger.debug(f"Initializing PostgreSQL backend (host={postgres_host}, db={postgres_db})")
         return PostgreSQLBackend(
             host=postgres_host,
             port=postgres_port,

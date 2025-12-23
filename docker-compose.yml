@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Document Embedding Pipeline Application
+  # ============================================
+  embedding-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: embedding-pipeline
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent storage for uploaded documents
+      - ./uploads:/app/uploads
+
+    # ============================================
+    # Environment Configuration
+    # ============================================
+    # Choose ONE storage backend: PostgreSQL or Supabase
+    # Uncomment the section you want to use
+    # ============================================
+
+    # ============================================
+    # Environment variables are loaded from .env file
+    # You can override any variable here if needed
+    # ============================================
+    environment:
+      # Web Server Configuration
+      # Force production mode for Docker (binds to 0.0.0.0)
+      # .env file can still use ENVIRONMENT=development for local python run.py
+      - ENVIRONMENT=production
+      - WEB_PORT=${WEB_PORT:-8000}
+      - WEB_WORKERS=${WEB_WORKERS:-4}
+
+      # ----------------------------------------
+      # Storage Backend (from .env)
+      # ----------------------------------------
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-postgresql}
+
+      # PostgreSQL Configuration (from .env)
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-prefer}
+
+      # Supabase Configuration (from .env, if using Supabase)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+
+      # ----------------------------------------
+      # LM Studio Configuration (from .env)
+      # ----------------------------------------
+      - LM_STUDIO_URL=${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}
+
+      # ----------------------------------------
+      # Chunking & Processing Configuration (from .env)
+      # ----------------------------------------
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-200}
+      - CHUNKING_STRATEGY=${CHUNKING_STRATEGY:-character}
+      - TABLE_NAME=${TABLE_NAME:-documents}
+      - SKIP_IF_EXISTS=${SKIP_IF_EXISTS:-true}
+      - SEMANTIC_SIMILARITY_THRESHOLD=${SEMANTIC_SIMILARITY_THRESHOLD:-0.75}
+
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/config', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    restart: unless-stopped
+
+    # Uncomment if using local PostgreSQL service below
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # ============================================
+  # Local PostgreSQL Database (OPTIONAL)
+  # ============================================
+  # Uncomment this entire service to run a local PostgreSQL database
+  # This is useful for local development/testing
+  # If you're using a remote database, keep this commented out
+  # ============================================
+
+  # postgres:
+  #   image: pgvector/pgvector:pg16
+  #   container_name: embedding-postgres
+  #   environment:
+  #     - POSTGRES_DB=embeddings_db
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #   volumes:
+  #     # Persistent database storage
+  #     - postgres_data:/var/lib/postgresql/data
+  #     # Initialize database with schema
+  #     - ./scripts/db_setup.sql:/docker-entrypoint-initdb.d/db_setup.sql
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+# ============================================
+# Volumes
+# ============================================
+#volumes:
+  # Uncomment if using local PostgreSQL service
+  # postgres_data:
+  #   driver: local
+
+# ============================================
+# Networks (optional - for advanced setups)
+# ============================================
+# networks:
+#   embedding-net:
+#     driver: bridge

@@ -5,6 +5,7 @@ Provides REST API for document upload, search, status, and deletion
 import os
 import uuid
 import time
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
@@ -109,10 +110,10 @@ async def startup_event():
             "available_backends": ["postgresql", "supabase"]
         }
 
-        print(f"✓ Document Embedding Pipeline started successfully")
-        print(f"  Backend: {config['backend_type']}")
-        print(f"  LM Studio: {lm_studio_url}")
-        print(f"  Chunking: {config['chunking_strategy']} (size: {config['chunk_size']})")
+        # Log startup info (once per worker)
+        worker_id = os.getpid()
+        logger = logging.getLogger("uvicorn.error")
+        logger.info(f"Worker {worker_id}: Initialized {config['backend_type']} backend with {config['chunking_strategy']} chunking")
 
     except ValueError as e:
         print(f"Configuration error: {e}")
