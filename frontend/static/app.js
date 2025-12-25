@@ -892,7 +892,10 @@ function formatMessageContent(content) {
     // Inline code: `code` (single backticks)
     formatted = formatted.replace(/`(.+?)`/g, '<code>$1</code>');
 
-    // Line breaks: preserve \n as <br>
+    // Line breaks: collapse multiple newlines and convert to <br>
+    // First collapse 3+ consecutive newlines to just 2 (paragraph break)
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+    // Then convert remaining newlines to <br>
     formatted = formatted.replace(/\n/g, '<br>');
 
     // Lists: convert - or * at start of line to bullets
@@ -909,6 +912,30 @@ function formatMessageContent(content) {
         // Need to escape the lightning bolt for regex
         formatted = formatted.replace(`⚡CODEBLOCK${index}⚡`, codeHtml);
     });
+
+    // Cleanup: Remove excessive <br> tags around block elements
+    // Remove <br> before and after headings
+    formatted = formatted.replace(/(<br>)+(<h[1-6]>)/g, '$2');
+    formatted = formatted.replace(/(<\/h[1-6]>)(<br>)+/g, '$1');
+
+    // Remove <br> before and after horizontal rules
+    formatted = formatted.replace(/(<br>)+(<hr>)/g, '$2');
+    formatted = formatted.replace(/(<hr>)(<br>)+/g, '$1');
+
+    // Remove <br> before and after lists
+    formatted = formatted.replace(/(<br>)+(<ul>)/g, '$2');
+    formatted = formatted.replace(/(<\/ul>)(<br>)+/g, '$1');
+
+    // Remove <br> before and after tables
+    formatted = formatted.replace(/(<br>)+(<table)/g, '$2');
+    formatted = formatted.replace(/(<\/table>)(<br>)+/g, '$1');
+
+    // Remove <br> before and after code blocks
+    formatted = formatted.replace(/(<br>)+(<div class="code-block-wrapper">)/g, '$2');
+    formatted = formatted.replace(/(<\/div>)(<br>)+(?=\s|$)/g, '$1');
+
+    // Collapse multiple consecutive <br> tags to maximum 2 (paragraph spacing)
+    formatted = formatted.replace(/(<br>){3,}/g, '<br><br>');
 
     return formatted;
 }
