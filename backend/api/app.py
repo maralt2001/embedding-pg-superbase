@@ -347,6 +347,8 @@ async def chat_with_documents(
         )
 
         # Build context from results
+        documents_found = bool(results)
+
         if not results:
             context = "No relevant documents found."
             sources = []
@@ -362,16 +364,24 @@ async def chat_with_documents(
                 })
             context = "\n\n".join(context_parts)
 
-        # Construct prompt
-        system_prompt = """You are a helpful assistant that answers questions based on the provided document context.
-If the answer cannot be found in the context, say so clearly. Always base your answers on the provided documents."""
+        # Construct prompt based on whether documents were found
+        if documents_found:
+            system_prompt = """You are a helpful assistant that answers questions based on the provided document context.
+Always base your answers primarily on the provided documents. If additional context would be helpful, you may supplement with general knowledge, but make it clear what comes from the documents versus general knowledge."""
 
-        user_prompt = f"""Context from documents:
+            user_prompt = f"""Context from documents:
 {context}
 
 Question: {query}
 
 Please provide a detailed answer based on the context above."""
+        else:
+            system_prompt = """You are a helpful assistant. Answer questions using your general knowledge.
+IMPORTANT: You must start your response by informing the user that no relevant information was found in the uploaded documents, and that you are answering based on general knowledge instead."""
+
+            user_prompt = f"""Question: {query}
+
+Note: No relevant documents were found in the database for this question. Please answer using your general knowledge, but inform the user about this."""
 
         # Stream generator function
         def generate_stream():

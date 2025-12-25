@@ -526,6 +526,9 @@ function addChatMessage(role, content, sources = null) {
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentDiv);
     messagesDiv.appendChild(messageDiv);
+
+    // Apply syntax highlighting to code blocks
+    highlightCodeBlocks(messageDiv);
 }
 
 function addStreamingMessage() {
@@ -562,6 +565,8 @@ function updateStreamingMessage(messageId, content, sources) {
     const textDiv = messageDiv.querySelector('.message-text');
     if (textDiv) {
         textDiv.innerHTML = formatMessageContent(content) + '<span class="typing-cursor">▋</span>';
+        // Apply syntax highlighting to code blocks
+        highlightCodeBlocks(messageDiv);
     }
 }
 
@@ -612,6 +617,9 @@ function finalizeStreamingMessage(messageId, content, sources) {
 
         contentDiv.appendChild(sourcesDiv);
     }
+
+    // Apply syntax highlighting to code blocks
+    highlightCodeBlocks(messageDiv);
 }
 
 function removeStreamingMessage(messageId) {
@@ -859,14 +867,27 @@ function formatMessageContent(content) {
     // Convert Markdown tables to HTML tables BEFORE converting newlines
     formatted = formatMarkdownTables(formatted);
 
+    // Convert markdown headings (# Heading)
+    // Must be done before converting newlines to <br>
+    formatted = formatted.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, text) => {
+        const level = hashes.length;
+        return `<h${level}>${text}</h${level}>`;
+    });
+
+    // Convert horizontal rules (---)
+    // Three or more hyphens on a line by themselves
+    formatted = formatted.replace(/^-{3,}$/gm, '<hr>');
+
     // Convert markdown-style formatting
     // Bold: **text** or __text__
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Only treat __ as bold if not part of a word (e.g., not in variable_names)
+    formatted = formatted.replace(/(?<![a-zA-Z0-9])__(.+?)__(?![a-zA-Z0-9])/g, '<strong>$1</strong>');
 
     // Italic: *text* or _text_
     formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
+    // Only treat _ as italic if not part of a word (e.g., not in variable_names)
+    formatted = formatted.replace(/(?<![a-zA-Z0-9])_([^_]+)_(?![a-zA-Z0-9])/g, '<em>$1</em>');
 
     // Inline code: `code` (single backticks)
     formatted = formatted.replace(/`(.+?)`/g, '<code>$1</code>');
@@ -897,6 +918,9 @@ function createCodeBlock(code, language) {
     const escapedCode = escapeHtml(code);
     const blockId = 'code-' + Math.random().toString(36).substring(2, 9);
 
+    // Add language class for highlight.js
+    const languageClass = language && language !== 'text' ? `language-${language}` : '';
+
     return `
         <div class="code-block-wrapper">
             <div class="code-block-header">
@@ -905,9 +929,22 @@ function createCodeBlock(code, language) {
                     Copy
                 </button>
             </div>
-            <pre><code id="${blockId}">${escapedCode}</code></pre>
+            <pre><code id="${blockId}" class="${languageClass}">${escapedCode}</code></pre>
         </div>
     `;
+}
+
+function highlightCodeBlocks(container) {
+    // Find all code blocks and apply syntax highlighting
+    if (typeof hljs !== 'undefined') {
+        const codeBlocks = container.querySelectorAll('pre code');
+        codeBlocks.forEach((block) => {
+            // Only highlight if it has a language class
+            if (block.className.startsWith('language-')) {
+                hljs.highlightElement(block);
+            }
+        });
+    }
 }
 
 function formatMarkdownTables(text) {
