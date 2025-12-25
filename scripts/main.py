@@ -18,15 +18,9 @@ load_dotenv()
 def main():
     # configuration from environment variables
     lm_studio_url = os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
-    backend_type = os.getenv("STORAGE_BACKEND")
 
-    # Prepare backend kwargs
+    # Prepare backend kwargs (PostgreSQL only)
     backend_kwargs = {
-        'backend_type': backend_type,
-        # Supabase config
-        'supabase_url': os.getenv("SUPABASE_URL"),
-        'supabase_key': os.getenv("SUPABASE_KEY"),
-        # PostgreSQL config
         'postgres_host': os.getenv("POSTGRES_HOST"),
         'postgres_port': int(os.getenv("POSTGRES_PORT", 5432)),
         'postgres_db': os.getenv("POSTGRES_DB"),
@@ -43,8 +37,7 @@ def main():
         )
     except ValueError as e:
         print(f"Configuration error: {e}")
-        print("\nPlease configure one of the following storage backends in your .env file:")
-        print("  - Supabase: Set SUPABASE_URL and SUPABASE_KEY")
+        print("\nPlease configure PostgreSQL backend in your .env file:")
         print("  - PostgreSQL: Set POSTGRES_HOST, POSTGRES_DB, POSTGRES_USER, and POSTGRES_PASSWORD")
         return
 

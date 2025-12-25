@@ -73,142 +73,6 @@ class StorageBackend(ABC):
         pass
 
 
-class SupabaseBackend(StorageBackend):
-    """Supabase storage backend implementation"""
-
-    def __init__(self, supabase_url: str, supabase_key: str):
-        from supabase import create_client, Client
-        self.client: Client = create_client(supabase_url, supabase_key)
-
-    def check_document_exists(self, document_name: str, table_name: str = "documents") -> Optional[str]:
-        """Check if a document already exists in Supabase and return its hash"""
-        try:
-            response = self.client.table(table_name)\
-                .select("file_hash")\
-                .eq("document_name", document_name)\
-                .limit(1)\
-                .execute()
-
-            if response.data and len(response.data) > 0:
-                return response.data[0].get("file_hash")
-            return None
-        except Exception as e:
-            print(f"Error checking document existence: {e}")
-            return None
-
-    def delete_document_chunks(self, document_name: str, table_name: str = "documents"):
-        """Delete all chunks of a document from Supabase"""
-        try:
-            response = self.client.table(table_name)\
-                .delete()\
-                .eq("document_name", document_name)\
-                .execute()
-            print(f"Deleted existing chunks for: {document_name}")
-            return response
-        except Exception as e:
-            print(f"Error deleting document chunks: {e}")
-            raise
-
-    def upload_chunks(self, chunks_with_embeddings: List[Dict], table_name: str = "documents"):
-        """Upload chunks and embeddings to Supabase"""
-        try:
-            response = self.client.table(table_name).insert(chunks_with_embeddings).execute()
-            print(f"Successfully uploaded {len(chunks_with_embeddings)} chunks to Supabase")
-            return response
-        except Exception as e:
-            print(f"Error uploading to Supabase: {e}")
-            raise
-
-    def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
-        """Search for similar chunks using Supabase's vector similarity"""
-        try:
-            # Fetch all documents and calculate similarity in Python
-            # This is less efficient but works without requiring SQL functions
-            print("Fetching documents from Supabase...")
-
-            response = self.client.table(table_name)\
-                .select("id, content, document_name, chunk_index, embedding, file_hash, processed_at")\
-                .execute()
-
-            if not response.data:
-                return []
-
-            # Calculate cosine similarity for each document
-            import math
-
-            results = []
-            for item in response.data:
-                if 'embedding' not in item or not item['embedding']:
-                    continue
-
-                doc_embedding = item['embedding']
-
-                # Convert embedding if it's a string (sometimes Supabase returns it as a string)
-                if isinstance(doc_embedding, str):
-                    import json
-                    doc_embedding = json.loads(doc_embedding)
-
-                # Ensure both embeddings are lists of floats
-                doc_embedding = [float(x) for x in doc_embedding]
-                query_emb = [float(x) for x in query_embedding]
-
-                # Calculate cosine similarity
-                dot_product = sum(a * b for a, b in zip(query_emb, doc_embedding))
-                magnitude1 = math.sqrt(sum(a * a for a in query_emb))
-                magnitude2 = math.sqrt(sum(a * a for a in doc_embedding))
-
-                if magnitude1 == 0 or magnitude2 == 0:
-                    similarity = 0.0
-                else:
-                    similarity = dot_product / (magnitude1 * magnitude2)
-
-                item['similarity'] = similarity
-                results.append(item)
-
-            # Sort by similarity (highest first) and limit results
-            results.sort(key=lambda x: x['similarity'], reverse=True)
-            return results[:limit]
-
-        except Exception as e:
-            print(f"Error searching chunks: {e}")
-            print("Note: This method fetches all chunks and calculates similarity in Python.")
-            print("For better performance with large datasets, create the match_documents function.")
-            print("See supabase_setup.sql for the SQL function definition")
-            raise
-
-    def get_all_documents(self, table_name: str = "documents") -> List[Dict]:
-        """Get summary of all processed documents from Supabase"""
-        try:
-            # Group by document_name and get stats
-            response = self.client.table(table_name)\
-                .select("document_name, processed_at")\
-                .execute()
-
-            if not response.data:
-                return []
-
-            # Group documents manually since Supabase doesn't support GROUP BY in select
-            docs_map = {}
-            for row in response.data:
-                doc_name = row['document_name']
-                if doc_name not in docs_map:
-                    docs_map[doc_name] = {
-                        'document_name': doc_name,
-                        'chunk_count': 0,
-                        'processed_at': row['processed_at']
-                    }
-                docs_map[doc_name]['chunk_count'] += 1
-
-            # Convert to list and sort by processed_at
-            documents = list(docs_map.values())
-            documents.sort(key=lambda x: x['processed_at'], reverse=True)
-
-            return documents
-        except Exception as e:
-            print(f"Error fetching documents: {e}")
-            raise
-
-
 class PostgreSQLBackend(StorageBackend):
     """PostgreSQL storage backend implementation"""
 
@@ -427,79 +291,41 @@ class PostgreSQLBackend(StorageBackend):
 
 def create_storage_backend(**kwargs) -> StorageBackend:
     """
-    Factory function to create appropriate storage backend
+    Factory function to create PostgreSQL storage backend
 
     Args:
-        backend_type: "supabase" or "postgresql" (optional, auto-detected if not provided)
-        supabase_url: Supabase URL (for Supabase backend)
-        supabase_key: Supabase API key (for Supabase backend)
-        postgres_host: PostgreSQL host (for PostgreSQL backend)
-        postgres_port: PostgreSQL port (for PostgreSQL backend)
-        postgres_db: PostgreSQL database name (for PostgreSQL backend)
-        postgres_user: PostgreSQL username (for PostgreSQL backend)
-        postgres_password: PostgreSQL password (for PostgreSQL backend)
-        postgres_sslmode: PostgreSQL SSL mode (for PostgreSQL backend, optional)
+        postgres_host: PostgreSQL host
+        postgres_port: PostgreSQL port (default: 5432)
+        postgres_db: PostgreSQL database name
+        postgres_user: PostgreSQL username
+        postgres_password: PostgreSQL password
+        postgres_sslmode: PostgreSQL SSL mode (optional, default: "prefer")
 
     Returns:
-        StorageBackend instance (either SupabaseBackend or PostgreSQLBackend)
+        PostgreSQLBackend instance
 
     Raises:
-        ValueError: If backend type cannot be determined or required credentials are missing
+        ValueError: If required credentials are missing
     """
-    backend_type = kwargs.get('backend_type')
+    postgres_host = kwargs.get('postgres_host')
+    postgres_port = kwargs.get('postgres_port', 5432)
+    postgres_db = kwargs.get('postgres_db')
+    postgres_user = kwargs.get('postgres_user')
+    postgres_password = kwargs.get('postgres_password')
+    postgres_sslmode = kwargs.get('postgres_sslmode', 'prefer')
 
-    # Auto-detect backend type if not specified
-    if not backend_type:
-        if kwargs.get('supabase_url') and kwargs.get('supabase_key'):
-            backend_type = 'supabase'
-        elif kwargs.get('postgres_host'):
-            backend_type = 'postgresql'
-        else:
-            raise ValueError(
-                "Could not determine storage backend. Please set STORAGE_BACKEND environment variable "
-                "or provide either (SUPABASE_URL and SUPABASE_KEY) or POSTGRES_HOST."
-            )
-
-    # Create appropriate backend
-    if backend_type == 'supabase':
-        supabase_url = kwargs.get('supabase_url')
-        supabase_key = kwargs.get('supabase_key')
-
-        if not supabase_url or not supabase_key:
-            raise ValueError("Supabase backend requires SUPABASE_URL and SUPABASE_KEY")
-
-        logger.debug(f"Initializing Supabase backend")
-        return SupabaseBackend(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key
-        )
-
-    elif backend_type == 'postgresql':
-        postgres_host = kwargs.get('postgres_host')
-        postgres_port = kwargs.get('postgres_port', 5432)
-        postgres_db = kwargs.get('postgres_db')
-        postgres_user = kwargs.get('postgres_user')
-        postgres_password = kwargs.get('postgres_password')
-        postgres_sslmode = kwargs.get('postgres_sslmode', 'prefer')
-
-        if not all([postgres_host, postgres_db, postgres_user, postgres_password]):
-            raise ValueError(
-                "PostgreSQL backend requires POSTGRES_HOST, POSTGRES_DB, "
-                "POSTGRES_USER, and POSTGRES_PASSWORD"
-            )
-
-        logger.debug(f"Initializing PostgreSQL backend (host={postgres_host}, db={postgres_db})")
-        return PostgreSQLBackend(
-            host=postgres_host,
-            port=postgres_port,
-            database=postgres_db,
-            user=postgres_user,
-            password=postgres_password,
-            sslmode=postgres_sslmode
-        )
-
-    else:
+    if not all([postgres_host, postgres_db, postgres_user, postgres_password]):
         raise ValueError(
-            f"Unknown backend type: {backend_type}. "
-            f"Supported backends: 'supabase', 'postgresql'"
+            "PostgreSQL backend requires POSTGRES_HOST, POSTGRES_DB, "
+            "POSTGRES_USER, and POSTGRES_PASSWORD"
         )
+
+    logger.debug(f"Initializing PostgreSQL backend (host={postgres_host}, db={postgres_db})")
+    return PostgreSQLBackend(
+        host=postgres_host,
+        port=postgres_port,
+        database=postgres_db,
+        user=postgres_user,
+        password=postgres_password,
+        sslmode=postgres_sslmode
+    )

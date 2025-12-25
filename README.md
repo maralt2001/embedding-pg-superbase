@@ -13,7 +13,7 @@ A comprehensive document embedding pipeline with CLI and web interface for proce
 │   │   ├── embedder.py       # Document embedding service
 │   │   └── web_service.py    # Web interface service layer
 │   └── storage/               # Storage backends
-│       └── backends.py        # Supabase & PostgreSQL implementations
+│       └── backends.py        # PostgreSQL implementation
 │
 ├── frontend/                   # Frontend assets
 │   └── static/                # HTML, CSS, JavaScript
@@ -23,8 +23,7 @@ A comprehensive document embedding pipeline with CLI and web interface for proce
 │
 ├── scripts/                    # Utility scripts
 │   ├── cli.py                # Command-line interface
-│   ├── main.py               # Legacy example script
-│   └── supabase_setup.sql    # Supabase database setup script
+│   └── main.py               # Legacy example script
 │
 ├── uploads/                    # Temporary file uploads (gitignored)
 ├── run.py                      # Web server entry point
@@ -53,22 +52,15 @@ Create a `.env` file with your configuration (you can copy from `.env.example`):
 # Environment (development or production)
 ENVIRONMENT=development
 
-# Storage Backend (postgresql or supabase)
-STORAGE_BACKEND=postgresql
-
 # LM Studio
 LM_STUDIO_URL=http://localhost:1234/v1
 
-# PostgreSQL (if using postgresql backend)
+# PostgreSQL Backend
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=embeddings_db
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_password
-
-# Supabase (if using supabase backend)
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
 
 # Web Server (optional overrides)
 WEB_PORT=8000
@@ -170,19 +162,6 @@ docker run -d \
   embedding-pipeline:latest
 ```
 
-**Run with Supabase**:
-```bash
-docker run -d \
-  -p 8000:8000 \
-  -v ./uploads:/app/uploads \
-  -e STORAGE_BACKEND=supabase \
-  -e SUPABASE_URL=https://your-project.supabase.co \
-  -e SUPABASE_KEY=your-key \
-  -e LM_STUDIO_URL=http://host.docker.internal:1234/v1 \
-  --name embedding-pipeline \
-  embedding-pipeline:latest
-```
-
 ### Docker Image Details
 
 - **Base Image**: `python:3.11-slim-bookworm`
@@ -200,7 +179,6 @@ docker run -d \
 
 **Storage Options:**
 - **Remote PostgreSQL**: Set `POSTGRES_HOST` to your database server
-- **Supabase**: Set `STORAGE_BACKEND=supabase` with Supabase credentials
 - **Local PostgreSQL**: Uncomment the postgres service in `docker-compose.yml`
 
 ### Common Docker Commands
@@ -249,9 +227,8 @@ docker exec -it embedding-pipeline /bin/bash
 
 - **Production Ready**: Environment-based configuration (development/production modes)
 - **Docker Support**: Multi-stage builds, docker-compose, health checks
-- **Multiple Storage Backends**: PostgreSQL (default) or Supabase
+- **PostgreSQL Storage**: Flexible local or remote PostgreSQL backend with optional pgvector
 - **Web Interface**: Modern UI with drag & drop upload, search, and management
-- **Dynamic Backend Switching**: Change between PostgreSQL and Supabase without restart
 - **CLI Interface**: Full command-line access to all features
 - **Semantic Chunking**: 3 strategies (character, paragraph, semantic)
 - **Incremental Updates**: Skip unchanged documents
@@ -265,7 +242,7 @@ See [CLAUDE.md](CLAUDE.md) for comprehensive documentation.
 
 - **Backend**: FastAPI with async support, background task processing
 - **Frontend**: Vanilla JavaScript (no build step required)
-- **Storage**: Pluggable backends (PostgreSQL with pgvector, Supabase)
+- **Storage**: PostgreSQL with optional pgvector extension
 - **Embeddings**: LM Studio local embedding server
 
 ## Development

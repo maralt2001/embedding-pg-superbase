@@ -135,25 +135,11 @@
         <div id="settings-tab" class="tab-content">
             <div class="card">
                 <h2>Configuration</h2>
-                <p class="info-text">System configuration</p>
-
-                <!-- Backend Selection -->
-                <div class="config-section">
-                    <h3>Storage Backend</h3>
-                    <div class="backend-selector">
-                        <label for="backendSelect">Select Backend:</label>
-                        <select id="backendSelect" class="select-input">
-                            <option value="postgresql">PostgreSQL (Local)</option>
-                            <option value="supabase">Supabase (Cloud)</option>
-                        </select>
-                        <button id="saveBackendBtn" class="btn btn-primary">Save Backend</button>
-                    </div>
-                    <div id="backendMessage" class="backend-message hidden"></div>
-                </div>
+                <p class="info-text">System configuration (Read-Only)</p>
 
                 <!-- Read-only Configuration Display -->
                 <div class="config-section">
-                    <h3>Other Settings (Read-Only)</h3>
+                    <h3>Settings</h3>
                     <div id="configDisplay" class="config-display">
                         <div class="loading">Loading configuration...</div>
                     </div>

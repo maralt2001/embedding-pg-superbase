@@ -65,16 +65,8 @@ async def startup_event():
     # Get LM Studio URL
     lm_studio_url = os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
 
-    # Determine backend type - default to PostgreSQL
-    backend_type = os.getenv("STORAGE_BACKEND", "postgresql")
-
-    # Prepare backend kwargs (same pattern as CLI)
+    # Prepare backend kwargs (PostgreSQL only)
     backend_kwargs = {
-        'backend_type': backend_type,
-        # Supabase config
-        'supabase_url': os.getenv("SUPABASE_URL"),
-        'supabase_key': os.getenv("SUPABASE_KEY"),
-        # PostgreSQL config
         'postgres_host': os.getenv("POSTGRES_HOST"),
         'postgres_port': int(os.getenv("POSTGRES_PORT", 5432)),
         'postgres_db': os.getenv("POSTGRES_DB"),
@@ -94,31 +86,25 @@ async def startup_event():
         service = WebEmbeddingService(embedder, tasks_store)
 
         # Store configuration for /api/config endpoint
-        # Get actual backend type from embedder
-        actual_backend = type(embedder.storage).__name__.replace('Backend', '').lower()
-
         config = {
             "lm_studio_url": lm_studio_url,
-            "backend_type": actual_backend,
-            "backend_type_config": backend_type,  # What was configured
+            "backend_type": "postgresql",
             "chunk_size": int(os.getenv("CHUNK_SIZE", 1000)),
             "chunk_overlap": int(os.getenv("CHUNK_OVERLAP", 200)),
             "chunking_strategy": os.getenv("CHUNKING_STRATEGY", "character"),
             "semantic_similarity_threshold": float(os.getenv("SEMANTIC_SIMILARITY_THRESHOLD", "0.75")),
             "table_name": os.getenv("TABLE_NAME", "documents"),
-            "skip_if_exists": os.getenv("SKIP_IF_EXISTS", "true").lower() == "true",
-            "available_backends": ["postgresql", "supabase"]
+            "skip_if_exists": os.getenv("SKIP_IF_EXISTS", "true").lower() == "true"
         }
 
         # Log startup info (once per worker)
         worker_id = os.getpid()
         logger = logging.getLogger("uvicorn.error")
-        logger.info(f"Worker {worker_id}: Initialized {config['backend_type']} backend with {config['chunking_strategy']} chunking")
+        logger.info(f"Worker {worker_id}: Initialized PostgreSQL backend with {config['chunking_strategy']} chunking")
 
     except ValueError as e:
         print(f"Configuration error: {e}")
-        print("\nPlease configure one of the following storage backends:")
-        print("  - Supabase: SUPABASE_URL and SUPABASE_KEY")
+        print("\nPlease configure PostgreSQL backend:")
         print("  - PostgreSQL: POSTGRES_HOST, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD")
         raise
 
@@ -167,79 +153,6 @@ async def read_root():
 async def get_config():
     """Get current configuration"""
     return config
-
-
-@app.put("/api/config")
-async def update_config(
-    backend_type: str = Query(..., description="Backend type (postgresql or supabase)")
-):
-    """
-    Update configuration (currently only backend_type is supported)
-
-    This will reinitialize the embedder with the new backend
-    """
-    global embedder, service, config
-
-    # Validate backend type
-    if backend_type not in ["postgresql", "supabase"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid backend type. Must be 'postgresql' or 'supabase'"
-        )
-
-    try:
-        # Get LM Studio URL
-        lm_studio_url = os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
-
-        # Prepare backend kwargs
-        backend_kwargs = {
-            'backend_type': backend_type,
-            # Supabase config
-            'supabase_url': os.getenv("SUPABASE_URL"),
-            'supabase_key': os.getenv("SUPABASE_KEY"),
-            # PostgreSQL config
-            'postgres_host': os.getenv("POSTGRES_HOST"),
-            'postgres_port': int(os.getenv("POSTGRES_PORT", 5432)),
-            'postgres_db': os.getenv("POSTGRES_DB"),
-            'postgres_user': os.getenv("POSTGRES_USER"),
-            'postgres_password': os.getenv("POSTGRES_PASSWORD"),
-            'postgres_sslmode': os.getenv("POSTGRES_SSLMODE", "prefer"),
-        }
-
-        # Create new embedder instance
-        new_embedder = DocumentEmbedder(
-            lm_studio_url=lm_studio_url,
-            **backend_kwargs
-        )
-
-        # Update globals
-        embedder = new_embedder
-        service = WebEmbeddingService(embedder, tasks_store)
-
-        # Get actual backend type from embedder
-        actual_backend = type(embedder.storage).__name__.replace('Backend', '').lower()
-
-        # Update config
-        config["backend_type"] = actual_backend
-        config["backend_type_config"] = backend_type
-
-        print(f"✓ Backend switched to: {actual_backend}")
-
-        return {
-            "message": f"Backend successfully changed to {actual_backend}",
-            "backend_type": actual_backend
-        }
-
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to initialize {backend_type} backend: {str(e)}"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to change backend: {str(e)}"
-        )
 
 
 @app.post("/api/documents/upload")

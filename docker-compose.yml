@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # ============================================
@@ -18,11 +17,6 @@ services:
     # ============================================
     # Environment Configuration
     # ============================================
-    # Choose ONE storage backend: PostgreSQL or Supabase
-    # Uncomment the section you want to use
-    # ============================================
-
-    # ============================================
     # Environment variables are loaded from .env file
     # You can override any variable here if needed
     # ============================================
@@ -35,21 +29,14 @@ services:
       - WEB_WORKERS=${WEB_WORKERS:-4}
 
       # ----------------------------------------
-      # Storage Backend (from .env)
+      # PostgreSQL Backend Configuration (from .env)
       # ----------------------------------------
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-postgresql}
-
-      # PostgreSQL Configuration (from .env)
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-prefer}
-
-      # Supabase Configuration (from .env, if using Supabase)
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
 
       # ----------------------------------------
       # LM Studio Configuration (from .env)

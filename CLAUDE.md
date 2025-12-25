@@ -8,26 +8,17 @@ This is a document embedding pipeline that:
 1. Reads documents (PDF, DOCX, TXT)
 2. Chunks text with configurable strategies (character-based, paragraph-based, or semantic)
 3. Generates embeddings via LM Studio (local embedding server)
-4. Stores chunks and embeddings in your choice of storage backend (Supabase or local PostgreSQL)
+4. Stores chunks and embeddings in PostgreSQL database
 5. Implements incremental updates to avoid reprocessing unchanged documents
 6. Provides both CLI and web interface for easy interaction
 
 ## Environment Setup
 
-### Storage Backend Configuration
+### PostgreSQL Backend Configuration
 
-The system supports two storage backends: **Supabase** (cloud) and **PostgreSQL** (local). Configure one in your `.env` file:
+Configure PostgreSQL connection in your `.env` file:
 
-**Option 1: Supabase Backend**
 ```bash
-STORAGE_BACKEND=supabase  # Optional, auto-detected if SUPABASE_URL is set
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-```
-
-**Option 2: PostgreSQL Backend**
-```bash
-STORAGE_BACKEND=postgresql  # Optional, auto-detected if POSTGRES_HOST is set
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432  # Optional, defaults to 5432
 POSTGRES_DB=embeddings_db
@@ -36,7 +27,7 @@ POSTGRES_PASSWORD=your_password
 POSTGRES_SSLMODE=prefer  # Optional: disable, allow, prefer, require
 ```
 
-**Common Configuration** (applies to both backends)
+**Common Configuration**
 ```bash
 LM_STUDIO_URL=http://localhost:1234/v1  # Optional, defaults to this
 CHUNK_SIZE=1000  # Optional
@@ -46,13 +37,6 @@ CHUNKING_STRATEGY=paragraph  # Optional: "character", "paragraph", or "semantic"
 SEMANTIC_SIMILARITY_THRESHOLD=0.75  # Optional: For semantic chunking (0.0-1.0, default: 0.75)
 SKIP_IF_EXISTS=true  # Optional: Skip unchanged documents (default: true)
 ```
-
-**Backend Selection:**
-- **Default**: PostgreSQL (if `STORAGE_BACKEND` is not set)
-- If `STORAGE_BACKEND` is set in `.env`, that backend will be used
-- **Web Interface**: Backend can be dynamically changed via Settings tab without server restart
-- **CLI**: Backend is determined at startup from `.env` or `--backend` argument
-- Configuration is shared between CLI and web interface
 
 ## Development Commands
 
@@ -125,9 +109,8 @@ python scripts/cli.py --table my_docs delete document.pdf
 
 **Global Options** (apply to all commands):
 ```bash
-# Override storage backend
-python scripts/cli.py --backend postgresql embed document.pdf
-python scripts/cli.py --backend supabase search "query"
+# Override database credentials (useful for CI/CD)
+python scripts/cli.py --postgres-host localhost --postgres-db mydb embed document.pdf
 
 # Override table name
 python scripts/cli.py --table custom_table embed document.pdf
@@ -213,18 +196,13 @@ Open your browser and navigate to `http://localhost:8000`
    - Delete functionality with confirmation dialog
    - Refresh button to reload document list
 
-4. **Settings Tab** - Configuration & Backend Selection
-   - **Dynamic Backend Switching**: Select between PostgreSQL and Supabase via dropdown
-   - Real-time backend switching without server restart
-   - Success/error feedback for backend changes
-   - Read-only display of other settings: LM Studio URL, table name, chunk size, chunking strategy, etc.
-   - Note: Other configuration changes must be made via `.env` file (requires server restart)
+4. **Settings Tab** - Configuration Display
+   - Read-only display of settings: Backend type, LM Studio URL, table name, chunk size, chunking strategy, etc.
+   - Note: Configuration changes must be made via `.env` file (requires server restart)
 
 **Technical Details:**
 - Uses same `.env` configuration as CLI
-- **Default backend: PostgreSQL** (can be changed via Settings tab or `.env`)
-- Dynamic backend switching without server restart
-- Works with both Supabase and PostgreSQL backends
+- Uses PostgreSQL as storage backend
 - Background task processing (non-blocking uploads)
 - In-memory task store with automatic cleanup (1 hour retention)
 - Progress polling every 1.5 seconds
@@ -239,7 +217,6 @@ The web interface exposes the following REST API endpoints:
 - `DELETE /api/documents/{name}` - Delete document
 - `GET /api/search?query=...&limit=5` - Semantic search
 - `GET /api/config` - Get current configuration
-- `PUT /api/config?backend_type=...` - Change storage backend (postgresql or supabase)
 
 **Environment Variables for Web Interface:**
 ```bash
@@ -268,28 +245,7 @@ WEB_RELOAD=true  # Optional: Override auto-reload setting (auto-configured based
 
 All other configuration uses the same environment variables as the CLI (see Common Configuration section above).
 
-### Supabase Database Setup (if using Supabase backend)
-
-1. **Create a Supabase project** at https://supabase.com
-
-2. **Enable pgvector extension:**
-   - Go to Database > Extensions in your Supabase dashboard
-   - Search for "vector" and enable the pgvector extension
-
-3. **Create the documents table and search function:**
-   - Go to SQL Editor in your Supabase dashboard
-   - Run the SQL script from `scripts/supabase_setup.sql`
-   - This creates the `match_documents()` function for similarity search
-
-4. **Get your credentials:**
-   - Go to Settings > API
-   - Copy your Project URL (SUPABASE_URL)
-   - Copy your anon/public key (SUPABASE_KEY)
-   - Add them to your `.env` file
-
-**Note:** Supabase functions work with fixed table names. If you need custom table names, create separate functions (see `scripts/supabase_setup.sql` for examples).
-
-### PostgreSQL Database Setup (if using PostgreSQL backend)
+### PostgreSQL Database Setup
 
 1. **Create the database:**
 ```bash
@@ -403,19 +359,6 @@ docker run -d \
   embedding-pipeline:latest
 ```
 
-**Run with Supabase:**
-```bash
-docker run -d \
-  -p 8000:8000 \
-  -v ./uploads:/app/uploads \
-  -e STORAGE_BACKEND=supabase \
-  -e SUPABASE_URL=https://your-project.supabase.co \
-  -e SUPABASE_KEY=your-key \
-  -e LM_STUDIO_URL=http://host.docker.internal:1234/v1 \
-  --name embedding-pipeline \
-  embedding-pipeline:latest
-```
-
 ### Docker Image Specifications
 
 **Image Details:**
@@ -451,21 +394,13 @@ docker run -d \
 **Storage Backend Options:**
 1. **Remote PostgreSQL** (recommended for production):
    ```yaml
-   - STORAGE_BACKEND=postgresql
    - POSTGRES_HOST=your-database-server.com
    - POSTGRES_DB=embeddings_db
    - POSTGRES_USER=postgres
    - POSTGRES_PASSWORD=your-secure-password
    ```
 
-2. **Supabase** (managed cloud):
-   ```yaml
-   - STORAGE_BACKEND=supabase
-   - SUPABASE_URL=https://your-project.supabase.co
-   - SUPABASE_KEY=your-anon-key
-   ```
-
-3. **Local PostgreSQL** (for testing):
+2. **Local PostgreSQL** (for testing):
    - Uncomment the `postgres` service in `docker-compose.yml`
    - Uncomment the `postgres_data` volume
    - Set `POSTGRES_HOST=postgres` (uses Docker service name)
@@ -565,8 +500,8 @@ FROM python:3.11-slim-bookworm
 Before deploying to production:
 
 - [ ] Update environment variables in `docker-compose.yml` with real credentials
-- [ ] Change default passwords (PostgreSQL, Supabase keys)
-- [ ] Configure remote PostgreSQL or Supabase backend
+- [ ] Change default PostgreSQL password
+- [ ] Configure remote PostgreSQL backend
 - [ ] Set `LM_STUDIO_URL` to accessible LM Studio instance
 - [ ] Set up persistent volume mount for `/app/uploads`
 - [ ] Configure reverse proxy (nginx/Traefik) for HTTPS
@@ -590,16 +525,12 @@ WEB_WORKERS=4                   # Production default: 4
 WEB_RELOAD=false                # Auto-configured based on ENVIRONMENT
 
 # Storage Backend
-STORAGE_BACKEND=postgresql      # postgresql or supabase
-POSTGRES_HOST=localhost         # Required for PostgreSQL
+POSTGRES_HOST=localhost         # Required
 POSTGRES_PORT=5432              # Optional, default: 5432
-POSTGRES_DB=embeddings_db       # Required for PostgreSQL
-POSTGRES_USER=postgres          # Required for PostgreSQL
-POSTGRES_PASSWORD=secret        # Required for PostgreSQL
+POSTGRES_DB=embeddings_db       # Required
+POSTGRES_USER=postgres          # Required
+POSTGRES_PASSWORD=secret        # Required
 POSTGRES_SSLMODE=prefer         # Optional: disable, allow, prefer, require
-
-SUPABASE_URL=https://...        # Required for Supabase
-SUPABASE_KEY=your-key           # Required for Supabase
 
 # LM Studio
 LM_STUDIO_URL=http://localhost:1234/v1  # Required
@@ -619,11 +550,10 @@ SKIP_IF_EXISTS=true            # Default: true
 
 **backend/storage/backends.py**
 - `StorageBackend`: Abstract base class defining storage interface
-- `SupabaseBackend`: Implementation for Supabase cloud storage
-- `PostgreSQLBackend`: Implementation for local PostgreSQL storage
+- `PostgreSQLBackend`: Implementation for PostgreSQL storage
   - Auto-detects pgvector extension availability
   - Falls back to `REAL[]` arrays if pgvector not available
-- `create_storage_backend()`: Factory function for automatic backend selection
+- `create_storage_backend()`: Factory function for creating PostgreSQL backend
 
 **backend/services/embedder.py** (DocumentEmbedder)
 - Main class orchestrating the embedding pipeline
@@ -694,19 +624,14 @@ SKIP_IF_EXISTS=true            # Default: true
 - Uses OpenAI-compatible `/embeddings` endpoint
 - Model: `text-embedding-nomic-embed-text-v1.5`
 
-**Storage Backends** (choose one):
+**Storage Backend**:
 
-**Supabase** (Cloud vector database)
-- Uses official `supabase-py` client
-- Cloud-hosted PostgreSQL with built-in pgvector
-- Ideal for: Production deployments, team collaboration, managed infrastructure
-
-**PostgreSQL** (Local vector database)
+**PostgreSQL**
 - Uses `psycopg2` driver
 - Self-hosted PostgreSQL (optional pgvector extension)
 - Ideal for: Local development, privacy-sensitive data, full control
 
-**Common table schema** (both backends):
+**Table schema**:
 - `content` (text) - The chunk text
 - `embedding` (vector or REAL[]) - The embedding vector
 - `document_name` (text) - Name of the source document
@@ -755,10 +680,7 @@ Document File → read_document() → chunk_text() →
 - File type detection uses Path.suffix
 
 ### Storage Backend Architecture
-- **Adapter pattern**: Abstract `StorageBackend` interface with multiple implementations
-- **Automatic selection**: Factory function chooses backend based on environment variables
-- **Backward compatible**: Existing Supabase configurations work without changes
-- **PostgreSQL specifics**:
+- **PostgreSQL backend**:
   - Auto-detects pgvector extension availability
   - Falls back to `REAL[]` arrays if pgvector not installed
   - Uses parameterized queries for SQL injection prevention
@@ -766,11 +688,11 @@ Document File → read_document() → chunk_text() →
 
 ## Features
 
-### 1. Flexible Storage Backends
-Choose between Supabase (cloud) or PostgreSQL (local):
-- **Supabase**: Managed infrastructure, zero database setup, built-in pgvector
-- **PostgreSQL**: Full control, local development, privacy-sensitive data
-- Both use identical table schema for easy migration
+### 1. PostgreSQL Storage Backend
+- Full control over your data
+- Optimized for local development and privacy-sensitive data
+- Optional pgvector extension for optimized vector search
+- Falls back to REAL[] arrays if pgvector not available
 
 ### 2. Multiple Chunking Strategies
 Choose the chunking strategy that best fits your needs:
@@ -793,32 +715,22 @@ All chunks include:
 - File hash for change detection
 - Processing timestamp for audit trail
 
-### 5. Command-Line Interface
-Comprehensive CLI with argparse support:
-- **embed**: Process single/multiple documents or entire directories
-- **search**: Semantic search across all processed documents
-- **status**: View summary of all processed documents
-- All settings configurable via CLI arguments or environment variables
-- Batch processing with progress reporting
-
-### 6. Semantic Search
+### 5. Semantic Search
 Query your embedded documents using natural language:
 - Cosine similarity search using embeddings
 - Configurable result limits
 - Returns relevance scores and content previews
-- Works with both Supabase and PostgreSQL backends
 - Optimized with pgvector when available
 
-### 7. Web Interface
+### 6. Web Interface
 Modern, user-friendly GUI built with FastAPI and vanilla JavaScript:
 - **Upload Tab**: Drag & drop file upload with real-time progress tracking
 - **Search Tab**: Natural language semantic search with configurable result limits
 - **Documents Tab**: List and manage all processed documents
-- **Settings Tab**: Dynamic backend switching (PostgreSQL ↔ Supabase) without server restart
+- **Settings Tab**: View system configuration (read-only)
 - Background task processing (non-blocking uploads)
 - Progress polling with visual feedback (reading → chunking → embedding → uploading)
 - Responsive design (mobile-friendly)
 - No build step required
-- **Default backend**: PostgreSQL
-- Works with both storage backends
+- PostgreSQL storage backend
 - REST API endpoints for programmatic access

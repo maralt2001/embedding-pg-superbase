@@ -745,10 +745,6 @@ async function deleteDocument(documentName) {
 // ============================================================================
 
 function initializeSettings() {
-    // Setup backend selector
-    const saveBackendBtn = document.getElementById('saveBackendBtn');
-    saveBackendBtn.addEventListener('click', saveBackend);
-
     loadConfig();
 }
 
@@ -766,10 +762,6 @@ async function loadConfig() {
         const config = await response.json();
         displayConfig(config);
 
-        // Set the backend selector to current backend
-        const backendSelect = document.getElementById('backendSelect');
-        backendSelect.value = config.backend_type;
-
     } catch (error) {
         configDiv.innerHTML = `<div class="empty-state">
             <div class="empty-state-icon">⚠️</div>
@@ -782,6 +774,7 @@ function displayConfig(config) {
     const configDiv = document.getElementById('configDisplay');
 
     const items = [
+        { label: 'Backend', value: 'PostgreSQL' },
         { label: 'LM Studio URL', value: config.lm_studio_url },
         { label: 'Table Name', value: config.table_name },
         { label: 'Chunk Size', value: config.chunk_size },
@@ -802,54 +795,6 @@ function displayConfig(config) {
     });
 
     configDiv.innerHTML = html;
-}
-
-async function saveBackend() {
-    const backendSelect = document.getElementById('backendSelect');
-    const selectedBackend = backendSelect.value;
-    const messageDiv = document.getElementById('backendMessage');
-    const saveBtn = document.getElementById('saveBackendBtn');
-
-    // Disable button during save
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
-
-    // Show info message
-    messageDiv.className = 'backend-message info';
-    messageDiv.textContent = `Switching to ${selectedBackend}...`;
-    messageDiv.classList.remove('hidden');
-
-    try {
-        const response = await fetch(`/api/config?backend_type=${selectedBackend}`, {
-            method: 'PUT'
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to change backend');
-        }
-
-        const result = await response.json();
-
-        // Show success message
-        messageDiv.className = 'backend-message success';
-        messageDiv.textContent = `✓ ${result.message}`;
-
-        // Reload configuration to update display
-        setTimeout(() => {
-            loadConfig();
-            messageDiv.classList.add('hidden');
-        }, 2000);
-
-    } catch (error) {
-        // Show error message
-        messageDiv.className = 'backend-message error';
-        messageDiv.textContent = `✗ Error: ${error.message}`;
-    } finally {
-        // Re-enable button
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Backend';
-    }
 }
 
 // ============================================================================

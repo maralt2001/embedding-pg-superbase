@@ -24,16 +24,8 @@ def create_embedder_from_args(args):
     # Get LM Studio URL from args or environment
     lm_studio_url = args.lm_studio_url or os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
 
-    # Determine backend type
-    backend_type = args.backend or os.getenv("STORAGE_BACKEND")
-
-    # Prepare backend kwargs
+    # Prepare backend kwargs (PostgreSQL only)
     backend_kwargs = {
-        'backend_type': backend_type,
-        # Supabase config
-        'supabase_url': args.supabase_url or os.getenv("SUPABASE_URL"),
-        'supabase_key': args.supabase_key or os.getenv("SUPABASE_KEY"),
-        # PostgreSQL config
         'postgres_host': args.postgres_host or os.getenv("POSTGRES_HOST"),
         'postgres_port': args.postgres_port or int(os.getenv("POSTGRES_PORT", 5432)),
         'postgres_db': args.postgres_db or os.getenv("POSTGRES_DB"),
@@ -50,9 +42,9 @@ def create_embedder_from_args(args):
         return embedder
     except ValueError as e:
         print(f"Configuration error: {e}")
-        print("\nPlease configure one of the following storage backends:")
+        print("\nPlease configure PostgreSQL backend:")
         print("  - Via .env file (recommended)")
-        print("  - Via command-line arguments (--supabase-url, --postgres-host, etc.)")
+        print("  - Via command-line arguments (--postgres-host, --postgres-db, etc.)")
         print("\nRun with --help for more information")
         sys.exit(1)
 
@@ -304,12 +296,7 @@ Examples:
 
     # Global arguments
     parser.add_argument('--lm-studio-url', help='LM Studio URL (default: from .env or http://localhost:1234/v1)')
-    parser.add_argument('--backend', choices=['supabase', 'postgresql'], help='Storage backend type')
     parser.add_argument('--table', help='Table name (default: from .env or "documents")')
-
-    # Supabase arguments
-    parser.add_argument('--supabase-url', help='Supabase URL')
-    parser.add_argument('--supabase-key', help='Supabase API key')
 
     # PostgreSQL arguments
     parser.add_argument('--postgres-host', help='PostgreSQL host')
