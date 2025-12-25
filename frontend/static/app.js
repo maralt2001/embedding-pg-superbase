@@ -811,8 +811,49 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function copyCodeToClipboard(codeBlockId, button) {
+    const codeElement = document.getElementById(codeBlockId);
+    if (!codeElement) return;
+
+    // Get the text content (unescaped)
+    const code = codeElement.textContent;
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(code).then(() => {
+        // Update button text
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        button.classList.add('copied');
+
+        // Reset after 2 seconds
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy code:', err);
+        button.textContent = 'Failed';
+        setTimeout(() => {
+            button.textContent = 'Copy';
+        }, 2000);
+    });
+}
+
 function formatMessageContent(content) {
-    // Escape HTML first
+    // Process code blocks FIRST (before escaping HTML)
+    // This preserves the code content and prevents double-escaping
+    const codeBlocks = [];
+    let codeBlockIndex = 0;
+
+    // Replace code blocks with unique placeholders that won't conflict with markdown
+    content = content.replace(/```(\w+)?\n([\s\S]+?)```/g, (match, language, code) => {
+        const placeholder = `⚡CODEBLOCK${codeBlockIndex}⚡`;
+        codeBlocks.push({ language: language || 'text', code: code.trim() });
+        codeBlockIndex++;
+        return placeholder;
+    });
+
+    // Escape HTML
     let formatted = escapeHtml(content);
 
     // Convert Markdown tables to HTML tables BEFORE converting newlines
@@ -827,7 +868,7 @@ function formatMessageContent(content) {
     formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
     formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
 
-    // Code: `code`
+    // Inline code: `code` (single backticks)
     formatted = formatted.replace(/`(.+?)`/g, '<code>$1</code>');
 
     // Line breaks: preserve \n as <br>
@@ -841,7 +882,32 @@ function formatMessageContent(content) {
         return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
     });
 
+    // Replace code block placeholders with actual formatted code blocks
+    codeBlocks.forEach((block, index) => {
+        const codeHtml = createCodeBlock(block.code, block.language);
+        // Need to escape the lightning bolt for regex
+        formatted = formatted.replace(`⚡CODEBLOCK${index}⚡`, codeHtml);
+    });
+
     return formatted;
+}
+
+function createCodeBlock(code, language) {
+    // Escape HTML in code content
+    const escapedCode = escapeHtml(code);
+    const blockId = 'code-' + Math.random().toString(36).substring(2, 9);
+
+    return `
+        <div class="code-block-wrapper">
+            <div class="code-block-header">
+                <span class="code-block-language">${escapeHtml(language)}</span>
+                <button class="copy-code-btn" onclick="copyCodeToClipboard('${blockId}', this)">
+                    Copy
+                </button>
+            </div>
+            <pre><code id="${blockId}">${escapedCode}</code></pre>
+        </div>
+    `;
 }
 
 function formatMarkdownTables(text) {
