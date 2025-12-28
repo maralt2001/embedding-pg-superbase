@@ -724,7 +724,7 @@ header h1 {
 }
 
 .message-text li::marker {
-    color: #06b6d4;
+    color: #cbd5e1;  /* Same color as list text for consistency */
 }
 
 /* Markdown tables */
