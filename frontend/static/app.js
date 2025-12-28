@@ -46,6 +46,8 @@ function switchTab(tabName) {
         loadConfig();
     } else if (tabName === 'upload') {
         resetUploadUI();
+    } else if (tabName === 'search') {
+        loadDocumentFilter();
     }
 }
 
@@ -278,14 +280,48 @@ function initializeSearch() {
             performSearch();
         }
     });
+
+    // Load documents for filter dropdown
+    loadDocumentFilter();
+}
+
+async function loadDocumentFilter() {
+    try {
+        const response = await fetch('/api/documents');
+        if (!response.ok) return;
+
+        const documents = await response.json();
+        const select = document.getElementById('searchDocument');
+
+        // Keep "All documents" option
+        select.innerHTML = '<option value="">All documents</option>';
+
+        // Add document options
+        documents.forEach(doc => {
+            const option = document.createElement('option');
+            option.value = doc.document_name;
+            option.textContent = doc.document_name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load documents for filter:', error);
+    }
 }
 
 async function performSearch() {
     const query = document.getElementById('searchQuery').value.trim();
     const limit = document.getElementById('searchLimit').value;
+    const documentFilter = document.getElementById('searchDocument').value;
+    const minScoreInput = document.getElementById('searchMinScore').value;
 
     if (!query) {
         showError('Please enter a search query');
+        return;
+    }
+
+    // Validate min_score if provided
+    if (minScoreInput && (parseFloat(minScoreInput) < 0 || parseFloat(minScoreInput) > 1)) {
+        showError('Minimum score must be between 0.0 and 1.0');
         return;
     }
 
@@ -293,7 +329,16 @@ async function performSearch() {
     resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
 
     try {
-        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+        // Build query params
+        let url = `/api/search?query=${encodeURIComponent(query)}&limit=${limit}`;
+        if (documentFilter) {
+            url += `&document=${encodeURIComponent(documentFilter)}`;
+        }
+        if (minScoreInput) {
+            url += `&min_score=${minScoreInput}`;
+        }
+
+        const response = await fetch(url);
 
         if (!response.ok) {
             const error = await response.json();
@@ -301,7 +346,7 @@ async function performSearch() {
         }
 
         const results = await response.json();
-        displaySearchResults(results);
+        displaySearchResults(results, { document: documentFilter, minScore: minScoreInput });
 
     } catch (error) {
         resultsDiv.innerHTML = `<div class="empty-state">
@@ -311,18 +356,41 @@ async function performSearch() {
     }
 }
 
-function displaySearchResults(results) {
+function displaySearchResults(results, filters = {}) {
     const resultsDiv = document.getElementById('searchResults');
 
     if (results.length === 0) {
+        let message = 'No results found. Try a different query.';
+        let hints = [];
+
+        if (filters.document) {
+            hints.push(`Try searching in all documents instead of just "${filters.document}"`);
+        }
+        if (filters.minScore) {
+            hints.push(`Try lowering the minimum score threshold (current: ${filters.minScore})`);
+        }
+
+        let hintsHtml = hints.length > 0
+            ? `<p style="margin-top: 10px; color: #6c757d; font-size: 0.9em;">Hints:<br>${hints.map(h => `• ${h}`).join('<br>')}</p>`
+            : '';
+
         resultsDiv.innerHTML = `<div class="empty-state">
             <div class="empty-state-icon">🔍</div>
-            <p>No results found. Try a different query.</p>
+            <p>${message}</p>
+            ${hintsHtml}
         </div>`;
         return;
     }
 
-    let html = `<p style="margin-bottom: 20px; color: #6c757d;">Found ${results.length} result(s)</p>`;
+    let filterInfo = '';
+    if (filters.document || filters.minScore) {
+        let filterParts = [];
+        if (filters.document) filterParts.push(`document: ${filters.document}`);
+        if (filters.minScore) filterParts.push(`min score: ${filters.minScore}`);
+        filterInfo = ` (filtered by ${filterParts.join(', ')})`;
+    }
+
+    let html = `<p style="margin-bottom: 20px; color: #6c757d;">Found ${results.length} result(s)${filterInfo}</p>`;
 
     results.forEach((result, index) => {
         const similarity = (result.similarity * 100).toFixed(1);

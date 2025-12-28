@@ -88,6 +88,7 @@ async def startup_event():
         # Store configuration for /api/config endpoint
         config = {
             "lm_studio_url": lm_studio_url,
+            "embedding_model": embedder.embedding_model,
             "backend_type": "postgresql",
             "chunk_size": int(os.getenv("CHUNK_SIZE", 1000)),
             "chunk_overlap": int(os.getenv("CHUNK_OVERLAP", 200)),
@@ -282,7 +283,9 @@ async def delete_document(document_name: str):
 @app.get("/api/search")
 async def search_documents(
     query: str = Query(..., description="Search query"),
-    limit: int = Query(5, ge=1, le=50, description="Number of results to return")
+    limit: int = Query(5, ge=1, le=50, description="Number of results to return"),
+    document: Optional[str] = Query(None, description="Filter results to specific document"),
+    min_score: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum similarity score (0.0-1.0)")
 ):
     """
     Perform semantic search across all documents
@@ -298,11 +301,13 @@ async def search_documents(
         # Get embedding for query
         query_embedding = embedder.get_embedding(query)
 
-        # Search similar chunks
+        # Search similar chunks with filters
         results = embedder.storage.search_similar_chunks(
             query_embedding=query_embedding,
             table_name=table_name,
-            limit=limit
+            limit=limit,
+            document_name=document,
+            min_score=min_score
         )
 
         return results
@@ -319,7 +324,9 @@ async def search_documents(
 @app.post("/api/chat")
 async def chat_with_documents(
     query: str = Query(..., description="User question"),
-    limit: int = Query(5, ge=1, le=20, description="Number of context chunks to retrieve")
+    limit: int = Query(5, ge=1, le=20, description="Number of context chunks to retrieve"),
+    document: Optional[str] = Query(None, description="Filter context to specific document"),
+    min_score: Optional[float] = Query(None, ge=0.0, le=1.0, description="Minimum similarity score for context (0.0-1.0)")
 ):
     """
     Chat with documents using RAG (Retrieval Augmented Generation) with streaming
@@ -339,11 +346,13 @@ async def chat_with_documents(
         # Get embedding for query
         query_embedding = embedder.get_embedding(query)
 
-        # Search similar chunks
+        # Search similar chunks with filters
         results = embedder.storage.search_similar_chunks(
             query_embedding=query_embedding,
             table_name=table_name,
-            limit=limit
+            limit=limit,
+            document_name=document,
+            min_score=min_score
         )
 
         # Build context from results

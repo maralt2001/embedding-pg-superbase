@@ -1,5 +1,24 @@
 # Feature Roadmap
 
+## Recent Improvements (2025-12-28) 🆕
+
+### Text Extraction Quality
+- [x] **Switched from PyPDF2 to pymupdf** for PDF text extraction
+  - Correctly preserves whitespace between words
+  - Significantly better text quality
+  - No more concatenated words (e.g., "Um das Ganze" instead of "UmdasGanze")
+
+### Configurable Embedding Models
+- [x] **Embedding model is now configurable** via `EMBEDDING_MODEL` environment variable
+  - Supports multiple models (nomic-embed-768dim, qwen3-1024dim, etc.)
+  - Automatic model detection and usage
+  - Important: Requires table recreation when changing dimensions (768→1024 or vice versa)
+
+### Advanced Search Filtering
+- [x] **Document name filter** - Search within specific documents only
+- [x] **Minimum similarity score filter** - Set threshold (0.0-1.0) for result quality
+- [x] Available in CLI (`--document`, `--min-score`), Web-UI, and API
+
 ## Implemented Features ✓
 
 ### 7. CLI mit Argumenten ✓
@@ -22,13 +41,16 @@
 - [x] Update-Strategie für modifizierte Dokumente
 - [x] Automatisches Löschen alter Chunks bei Änderungen
 
-### 1. Semantic Search / Query-Funktion ✓ (Teilweise)
+### 1. Semantic Search / Query-Funktion ✓
 - [x] Möglichkeit, Fragen zu stellen und ähnliche Chunks zu finden
 - [x] Nutzt die bereits gespeicherten Embeddings für Ähnlichkeitssuche
 - [x] Ausgabe der relevantesten Textpassagen mit Scores
 - [x] Unterstützt sowohl Supabase als auch PostgreSQL
 - [x] Optimiert mit pgvector wenn verfügbar
-- [ ] Erweiterte Filterung und Ranking (für spätere Iteration)
+- [x] Erweiterte Filterung und Ranking:
+  - [x] Filter nach Dokumentname
+  - [x] Filter nach minimalem Similarity Score
+  - [x] Verfügbar in CLI, Web-Interface und API
 
 ### 9. Web-Interface ✓
 - [x] FastAPI Backend mit REST API

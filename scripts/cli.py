@@ -143,9 +143,21 @@ def cmd_search(args):
 
     table_name = args.table or os.getenv("TABLE_NAME", "documents")
     limit = args.limit
+    document_filter = args.document
+    min_score = args.min_score
+
+    # Validate min_score if provided
+    if min_score is not None:
+        if not 0.0 <= min_score <= 1.0:
+            print(f"Error: --min-score must be between 0.0 and 1.0 (got {min_score})")
+            sys.exit(1)
 
     # Get embedding for the query
     print(f"Searching for: '{args.query}'")
+    if document_filter:
+        print(f"Filtering by document: {document_filter}")
+    if min_score is not None:
+        print(f"Minimum score filter: {min_score:.2f}")
     print("Generating query embedding...")
 
     try:
@@ -156,11 +168,17 @@ def cmd_search(args):
         results = embedder.storage.search_similar_chunks(
             query_embedding=query_embedding,
             table_name=table_name,
-            limit=limit
+            limit=limit,
+            document_name=document_filter,
+            min_score=min_score
         )
 
         if not results:
             print("\nNo results found.")
+            if document_filter:
+                print(f"Tip: Check that document '{document_filter}' exists using 'python cli.py status'")
+            if min_score is not None:
+                print(f"Tip: Try lowering the --min-score threshold (current: {min_score:.2f})")
             return
 
         # Display results
@@ -326,6 +344,8 @@ Examples:
     search_parser = subparsers.add_parser('search', help='Search for similar chunks (semantic search)')
     search_parser.add_argument('query', help='Search query text')
     search_parser.add_argument('--limit', type=int, default=5, help='Number of results to return (default: 5)')
+    search_parser.add_argument('--document', help='Filter results to specific document (e.g., "document.pdf")')
+    search_parser.add_argument('--min-score', type=float, help='Minimum similarity score (0.0-1.0, e.g., 0.7)')
 
     # STATUS command
     status_parser = subparsers.add_parser('status', help='Show status of processed documents')

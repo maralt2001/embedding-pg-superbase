@@ -82,6 +82,15 @@ python scripts/cli.py search "What is Ansible?"
 # Search with custom result limit
 python scripts/cli.py search "configuration management" --limit 10
 
+# Filter by document name
+python scripts/cli.py search "deployment strategies" --document my_doc.pdf
+
+# Filter by minimum similarity score
+python scripts/cli.py search "What is Docker?" --min-score 0.7
+
+# Combine filters
+python scripts/cli.py search "kubernetes" --document guide.pdf --min-score 0.8 --limit 5
+
 # Search in specific table
 python scripts/cli.py search "deployment strategies" --table my_docs
 ```
@@ -186,9 +195,13 @@ Open your browser and navigate to `http://localhost:8000`
 2. **Search Tab** - Semantic Search
    - Natural language query input
    - Configurable result limit (5, 10, or 20 results)
+   - Advanced filtering options:
+     - Filter by specific document
+     - Filter by minimum similarity score (0.0-1.0)
    - Results displayed with similarity scores (percentage match)
    - Document name and chunk index for each result
    - Content preview with expandable text
+   - Helpful hints when no results found with filters active
 
 3. **Documents Tab** - Document Management
    - List of all processed documents
@@ -535,11 +548,15 @@ POSTGRES_SSLMODE=prefer         # Optional: disable, allow, prefer, require
 # LM Studio
 LM_STUDIO_URL=http://localhost:1234/v1  # Required
 
+# Embedding Model Configuration
+EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5  # Default model (768-dim)
+# Alternative: text-embedding-qwen3-embedding-0.6b (1024-dim)
+
 # Chunking Configuration
 CHUNK_SIZE=1000                 # Default: 1000
 CHUNK_OVERLAP=200               # Default: 200 (character strategy only)
 CHUNKING_STRATEGY=paragraph     # character, paragraph, or semantic
-SEMANTIC_SIMILARITY_THRESHOLD=0.75  # For semantic chunking (0.0-1.0)
+SEMANTIC_SIMILARITY_THRESHOLD=0.75  # For semantic chunking (0.0-1.0, try 0.85 for stricter grouping)
 TABLE_NAME=documents            # Default: documents
 SKIP_IF_EXISTS=true            # Default: true
 ```
@@ -557,7 +574,8 @@ SKIP_IF_EXISTS=true            # Default: true
 
 **backend/services/embedder.py** (DocumentEmbedder)
 - Main class orchestrating the embedding pipeline
-- `read_document()`: Static method supporting PDF (PyPDF2), DOCX (python-docx), and TXT
+- Configurable embedding model via `EMBEDDING_MODEL` environment variable
+- `read_document()`: Static method supporting PDF (pymupdf), DOCX (python-docx), and TXT
 - `chunk_text()`: Splits text using configurable strategies (character, paragraph, or semantic-based)
 - `_chunk_by_paragraph()`: Private method for paragraph-based chunking with intelligent splitting
 - `_chunk_by_semantic()`: Instance method for semantic chunking using embedding similarity
@@ -622,7 +640,10 @@ SKIP_IF_EXISTS=true            # Default: true
 
 **LM Studio**: Local embedding server expected at `LM_STUDIO_URL`
 - Uses OpenAI-compatible `/embeddings` endpoint
-- Model: `text-embedding-nomic-embed-text-v1.5`
+- Configurable embedding model via `EMBEDDING_MODEL` environment variable
+- Default: `text-embedding-nomic-embed-text-v1.5` (768 dimensions)
+- Alternative: `text-embedding-qwen3-embedding-0.6b` (1024 dimensions)
+- **Important**: All documents must use the same embedding model (same dimensions)
 
 **Storage Backend**:
 
@@ -679,6 +700,12 @@ Document File → read_document() → chunk_text() →
 - Storage upload is done in a single batch insert operation
 - File type detection uses Path.suffix
 
+### PDF Text Extraction
+- Uses **pymupdf (fitz)** for superior PDF text extraction
+- Correctly preserves whitespace and formatting
+- Previously used PyPDF2 (had issues with missing spaces between words)
+- Significantly better text quality compared to PyPDF2
+
 ### Storage Backend Architecture
 - **PostgreSQL backend**:
   - Auto-detects pgvector extension availability
@@ -715,12 +742,15 @@ All chunks include:
 - File hash for change detection
 - Processing timestamp for audit trail
 
-### 5. Semantic Search
+### 5. Semantic Search with Advanced Filtering
 Query your embedded documents using natural language:
 - Cosine similarity search using embeddings
 - Configurable result limits
+- **Document name filtering**: Search within specific documents only
+- **Score threshold filtering**: Set minimum similarity score (0.0-1.0)
 - Returns relevance scores and content previews
 - Optimized with pgvector when available
+- Available in both CLI and web interface
 
 ### 6. Web Interface
 Modern, user-friendly GUI built with FastAPI and vanilla JavaScript:

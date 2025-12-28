@@ -1,16 +1,24 @@
+import os
 import requests
 from pathlib import Path
 from typing import List, Dict, Optional
-import PyPDF2
+import fitz  # pymupdf
 import docx
 import hashlib
 from datetime import datetime
 from backend.storage.backends import StorageBackend, create_storage_backend
 
 class DocumentEmbedder:
-    def __init__(self, lm_studio_url: str, storage_backend: StorageBackend = None, **backend_kwargs):
+    def __init__(self, lm_studio_url: str, storage_backend: StorageBackend = None,
+                 embedding_model: str = None, **backend_kwargs):
 
         self.lm_studio_url = lm_studio_url
+
+        # Get embedding model from parameter, env, or use default
+        self.embedding_model = (
+            embedding_model or
+            os.getenv("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+        )
 
         # Use provided backend or create one from kwargs
         if storage_backend:
@@ -34,10 +42,11 @@ class DocumentEmbedder:
         # PDF files
         elif file_path.suffix == '.pdf':
             text = []
-            with open(file_path, 'rb') as f:
-                pdf_reader = PyPDF2.PdfReader(f)
-                for page in pdf_reader.pages:
-                    text.append(page.extract_text())
+            pdf_document = fitz.open(file_path)
+            for page_num in range(pdf_document.page_count):
+                page = pdf_document[page_num]
+                text.append(page.get_text())
+            pdf_document.close()
             return '\n'.join(text)
 
         # Word documents
@@ -365,7 +374,7 @@ class DocumentEmbedder:
                 f"{self.lm_studio_url}/embeddings",
                 json={
                     "input": text,
-                    "model": "text-embedding-nomic-embed-text-v1.5"  # Adjust the model name as needed
+                    "model": self.embedding_model
                 },
                 headers={"Content-Type": "application/json"}
             )

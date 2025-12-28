@@ -45,7 +45,8 @@ class StorageBackend(ABC):
         pass
 
     @abstractmethod
-    def search_similar_chunks(self, query_embedding: List[float], table_name: str, limit: int = 5) -> List[Dict]:
+    def search_similar_chunks(self, query_embedding: List[float], table_name: str, limit: int = 5,
+                            document_name: Optional[str] = None, min_score: Optional[float] = None) -> List[Dict]:
         """
         Search for similar chunks using cosine similarity
 
@@ -53,6 +54,8 @@ class StorageBackend(ABC):
             query_embedding: The embedding vector to search for
             table_name: Table name
             limit: Maximum number of results to return
+            document_name: Optional filter to search only in specific document
+            min_score: Optional minimum similarity score (0.0-1.0)
 
         Returns:
             List of dicts with 'content', 'document_name', 'chunk_index', 'similarity'
@@ -174,20 +177,39 @@ class PostgreSQLBackend(StorageBackend):
             print(f"Error uploading to PostgreSQL: {e}")
             raise
 
-    def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5) -> List[Dict]:
-        """Search for similar chunks using cosine similarity"""
+    def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5,
+                            document_name: Optional[str] = None, min_score: Optional[float] = None) -> List[Dict]:
+        """Search for similar chunks using cosine similarity with optional filters"""
         try:
             cursor = self.conn.cursor()
 
             if self.has_pgvector:
                 # Set ivfflat.probes to search more lists for better recall
-                # This is especially important for small datasets or when using ivfflat indexes
-                # Using 50 to ensure good recall even with small datasets
                 cursor.execute("SET LOCAL ivfflat.probes = 50")
 
                 # Use pgvector's cosine distance operator
-                # Convert query_embedding to string representation for pgvector
                 embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
+
+                # Build WHERE clause and parameters in correct order
+                where_clauses = []
+                where_params = []
+
+                if document_name:
+                    where_clauses.append("document_name = %s")
+                    where_params.append(document_name)
+
+                if min_score is not None:
+                    # Convert min_score to max distance (1 - similarity = distance)
+                    max_distance = 1.0 - min_score
+                    where_clauses.append("(embedding <=> %s::vector) <= %s")
+                    where_params.extend([embedding_str, max_distance])
+
+                where_clause = " AND ".join(where_clauses) if where_clauses else ""
+                where_sql = f"WHERE {where_clause}" if where_clause else ""
+
+                # Build parameter list in correct order for query placeholders
+                params = [embedding_str] + where_params + [embedding_str, limit]
+
                 query = f"""
                     SELECT
                         content,
@@ -195,13 +217,21 @@ class PostgreSQLBackend(StorageBackend):
                         chunk_index,
                         1 - (embedding <=> %s::vector) as similarity
                     FROM {table_name}
+                    {where_sql}
                     ORDER BY embedding <=> %s::vector
                     LIMIT %s
                 """
-                cursor.execute(query, (embedding_str, embedding_str, limit))
+                cursor.execute(query, params)
             else:
                 # Manual cosine similarity calculation for REAL[] arrays
-                # Note: This is slower but works without pgvector
+                where_clauses = []
+
+                if document_name:
+                    where_clauses.append("document_name = %s")
+
+                where_clause = " AND ".join(where_clauses) if where_clauses else ""
+                where_sql = f"WHERE {where_clause}" if where_clause else ""
+
                 query = f"""
                     WITH query_vec AS (
                         SELECT %s::real[] as vec
@@ -226,13 +256,28 @@ class PostgreSQLBackend(StorageBackend):
                                 )
                             ) as similarity
                         FROM {table_name}
+                        {where_sql}
                     )
                     SELECT content, document_name, chunk_index, similarity
                     FROM similarities
+                """
+
+                params = [query_embedding]
+
+                if document_name:
+                    params.append(document_name)
+
+                if min_score is not None:
+                    query += " WHERE similarity >= %s"
+                    params.append(min_score)
+
+                query += """
                     ORDER BY similarity DESC
                     LIMIT %s
                 """
-                cursor.execute(query, (query_embedding, limit))
+                params.append(limit)
+
+                cursor.execute(query, params)
 
             rows = cursor.fetchall()
             cursor.close()
