@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Embedding Pipeline</title>
     <link rel="stylesheet" href="/static/style.css">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Highlight.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -19,19 +21,19 @@
         <!-- Tab navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="upload">
-                <span>↑</span> Upload
+                <i class="fas fa-cloud-upload-alt"></i> Upload
             </button>
             <button class="tab-btn" data-tab="search">
-                <span>⌕</span> Search
+                <i class="fas fa-search"></i> Search
             </button>
             <button class="tab-btn" data-tab="chat">
-                <span>💬</span> Chat
+                <i class="fas fa-comments"></i> Chat
             </button>
             <button class="tab-btn" data-tab="documents">
-                <span>≡</span> Documents
+                <i class="fas fa-file-alt"></i> Documents
             </button>
             <button class="tab-btn" data-tab="settings">
-                <span>⚙</span> Settings
+                <i class="fas fa-cog"></i> Settings
             </button>
         </div>
 
@@ -42,10 +44,10 @@
                 <p class="info-text">Supported formats: PDF, DOCX, TXT (max 50MB)</p>
 
                 <div class="upload-zone" id="dropZone">
-                    <div class="upload-icon">▢</div>
+                    <div class="upload-icon"><i class="fas fa-file-upload fa-3x"></i></div>
                     <p>Drag & drop file here or click to browse</p>
                     <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display: none;">
-                    <button type="button" class="btn btn-primary" id="browseBtn">Choose File</button>
+                    <button type="button" class="btn btn-primary" id="browseBtn"><i class="fas fa-folder-open"></i> Choose File</button>
                 </div>
 
                 <div id="uploadProgress" class="upload-progress hidden">
@@ -94,7 +96,7 @@
                             step="0.1"
                             style="width: 140px;"
                         >
-                        <button id="searchBtn" class="btn btn-primary">Search</button>
+                        <button id="searchBtn" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                     </div>
                 </div>
 
@@ -109,7 +111,7 @@
                 <p class="info-text">Ask questions and get answers based on your embedded documents</p>
 
                 <div class="chat-controls">
-                    <button id="clearChatBtn" class="btn btn-secondary">Clear Chat</button>
+                    <button id="clearChatBtn" class="btn btn-secondary"><i class="fas fa-trash-alt"></i> Clear Chat</button>
                 </div>
 
                 <div id="chatMessages" class="chat-messages">
@@ -128,7 +130,7 @@
                         class="chat-input"
                         placeholder="Ask a question about your documents..."
                     >
-                    <button id="sendChatBtn" class="btn btn-primary chat-send-btn">Send</button>
+                    <button id="sendChatBtn" class="btn btn-primary chat-send-btn"><i class="fas fa-paper-plane"></i> Send</button>
                 </div>
             </div>
         </div>
@@ -139,7 +141,7 @@
                 <h2>Processed Documents</h2>
                 <p class="info-text">View and manage all your embedded documents</p>
 
-                <button id="refreshDocumentsBtn" class="btn btn-secondary">↻ Refresh</button>
+                <button id="refreshDocumentsBtn" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Refresh</button>
 
                 <div id="documentsContainer" class="documents-container">
                     <div class="loading">Loading documents...</div>

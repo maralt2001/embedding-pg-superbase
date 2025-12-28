@@ -213,9 +213,9 @@ function showUploadSuccess(result) {
     resultMsg.classList.add('success');
 
     if (result.skipped) {
-        resultMsg.textContent = `✓ Document already exists and unchanged (${result.chunks_created} chunks)`;
+        resultMsg.innerHTML = `<i class="fas fa-check-circle"></i> Document already exists and unchanged (${result.chunks_created} chunks)`;
     } else {
-        resultMsg.textContent = `✓ Successfully processed! Created ${result.chunks_created} chunks in ${result.processing_time}s`;
+        resultMsg.innerHTML = `<i class="fas fa-check-circle"></i> Successfully processed! Created ${result.chunks_created} chunks in ${result.processing_time}s`;
     }
 
     // Reset file input
@@ -230,7 +230,7 @@ function showUploadError(message) {
     const resultMsg = document.getElementById('resultMessage');
     resultMsg.classList.remove('hidden', 'success');
     resultMsg.classList.add('error');
-    resultMsg.textContent = `✗ Error: ${message}`;
+    resultMsg.innerHTML = `<i class="fas fa-times-circle"></i> Error: ${message}`;
 
     // Reset file input
     document.getElementById('fileInput').value = '';
@@ -782,7 +782,7 @@ function displayDocuments(documents) {
                 <td>${processedDate}</td>
                 <td>
                     <button class="btn btn-danger" onclick="deleteDocument('${escapeHtml(doc.document_name)}')">
-                        Delete
+                        <i class="fas fa-trash-alt"></i> Delete
                     </button>
                 </td>
             </tr>

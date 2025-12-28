@@ -42,6 +42,7 @@ services:
       # LM Studio Configuration (from .env)
       # ----------------------------------------
       - LM_STUDIO_URL=${LM_STUDIO_URL:-http://host.docker.internal:1234/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}
 
       # ----------------------------------------
       # Chunking & Processing Configuration (from .env)
