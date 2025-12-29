@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 import logging
+from io import StringIO
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -144,11 +146,81 @@ class PostgreSQLBackend(StorageBackend):
             raise
 
     def upload_chunks(self, chunks_with_embeddings: List[Dict], table_name: str = "documents"):
-        """Upload chunks and embeddings to PostgreSQL"""
-        try:
-            cursor = self.conn.cursor()
+        """Upload chunks and embeddings to PostgreSQL using optimized COPY"""
+        if not chunks_with_embeddings:
+            return
 
-            # Prepare data for batch insert
+        num_chunks = len(chunks_with_embeddings)
+
+        try:
+            # Try PostgreSQL COPY first (fastest - 10-50x faster than INSERT)
+            self._upload_with_copy(chunks_with_embeddings, table_name)
+            print(f"✓ Successfully uploaded {num_chunks} chunks using COPY (optimized)")
+
+        except Exception as copy_error:
+            logger.warning(f"COPY failed ({copy_error}), falling back to execute_values...")
+
+            try:
+                # Fallback to execute_values (2-5x faster than executemany)
+                self._upload_with_execute_values(chunks_with_embeddings, table_name)
+                print(f"✓ Successfully uploaded {num_chunks} chunks using execute_values")
+
+            except Exception as values_error:
+                logger.warning(f"execute_values failed ({values_error}), falling back to executemany...")
+
+                # Final fallback to executemany (slowest but most compatible)
+                self._upload_with_executemany(chunks_with_embeddings, table_name)
+                print(f"✓ Successfully uploaded {num_chunks} chunks using executemany")
+
+    def _upload_with_copy(self, chunks_with_embeddings: List[Dict], table_name: str):
+        """Upload using PostgreSQL COPY FROM STDIN (fastest method)"""
+        cursor = self.conn.cursor()
+
+        try:
+            # Create CSV-like data stream
+            buffer = StringIO()
+
+            for chunk in chunks_with_embeddings:
+                # Convert embedding array to pgvector format: [1,2,3]
+                # Note: Use [...] for vector type, {...} for array type
+                embedding_str = '[' + ','.join(map(str, chunk['embedding'])) + ']'
+
+                # Escape special characters for CSV
+                content = chunk['content'].replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                document_name = chunk['document_name'].replace('\\', '\\\\').replace('\t', '\\t')
+                file_hash = chunk['file_hash'].replace('\\', '\\\\').replace('\t', '\\t')
+                processed_at = chunk['processed_at'].replace('\\', '\\\\').replace('\t', '\\t')
+
+                # Write tab-separated values
+                buffer.write(f"{content}\t{embedding_str}\t{document_name}\t{chunk['chunk_index']}\t{file_hash}\t{processed_at}\n")
+
+            # Reset buffer position
+            buffer.seek(0)
+
+            # Use COPY FROM STDIN
+            cursor.copy_from(
+                buffer,
+                table_name,
+                columns=('content', 'embedding', 'document_name', 'chunk_index', 'file_hash', 'processed_at'),
+                sep='\t'
+            )
+
+            self.conn.commit()
+
+        except Exception as e:
+            self.conn.rollback()
+            raise
+        finally:
+            cursor.close()
+
+    def _upload_with_execute_values(self, chunks_with_embeddings: List[Dict], table_name: str):
+        """Upload using psycopg2.extras.execute_values (medium speed)"""
+        from psycopg2.extras import execute_values
+
+        cursor = self.conn.cursor()
+
+        try:
+            # Prepare data tuples
             values = [
                 (
                     chunk["content"],
@@ -161,21 +233,55 @@ class PostgreSQLBackend(StorageBackend):
                 for chunk in chunks_with_embeddings
             ]
 
-            # Use executemany for efficient batch insert
+            # Use execute_values for batch insert
+            query = f"""
+                INSERT INTO {table_name}
+                (content, embedding, document_name, chunk_index, file_hash, processed_at)
+                VALUES %s
+            """
+            execute_values(cursor, query, values)
+
+            self.conn.commit()
+
+        except Exception as e:
+            self.conn.rollback()
+            raise
+        finally:
+            cursor.close()
+
+    def _upload_with_executemany(self, chunks_with_embeddings: List[Dict], table_name: str):
+        """Upload using executemany (slowest but most compatible)"""
+        cursor = self.conn.cursor()
+
+        try:
+            # Prepare data tuples
+            values = [
+                (
+                    chunk["content"],
+                    chunk["embedding"],
+                    chunk["document_name"],
+                    chunk["chunk_index"],
+                    chunk["file_hash"],
+                    chunk["processed_at"]
+                )
+                for chunk in chunks_with_embeddings
+            ]
+
+            # Use executemany for batch insert
             query = f"""
                 INSERT INTO {table_name}
                 (content, embedding, document_name, chunk_index, file_hash, processed_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """
             cursor.executemany(query, values)
-            self.conn.commit()
-            cursor.close()
 
-            print(f"Successfully uploaded {len(chunks_with_embeddings)} chunks to PostgreSQL")
+            self.conn.commit()
+
         except Exception as e:
             self.conn.rollback()
-            print(f"Error uploading to PostgreSQL: {e}")
             raise
+        finally:
+            cursor.close()
 
     def search_similar_chunks(self, query_embedding: List[float], table_name: str = "documents", limit: int = 5,
                             document_name: Optional[str] = None, min_score: Optional[float] = None) -> List[Dict]:

@@ -6,6 +6,7 @@ import fitz  # pymupdf
 import docx
 import hashlib
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from backend.storage.backends import StorageBackend, create_storage_backend
 
 class DocumentEmbedder:
@@ -70,12 +71,12 @@ class DocumentEmbedder:
             similarity_threshold: Similarity threshold for semantic chunking (0.0-1.0)
 
         Returns:
-            List of text chunks
+            List of text chunks (non-empty, stripped)
         """
         if strategy == "semantic":
-            return self._chunk_by_semantic(text, chunk_size, similarity_threshold)
+            chunks = self._chunk_by_semantic(text, chunk_size, similarity_threshold)
         elif strategy == "paragraph":
-            return DocumentEmbedder._chunk_by_paragraph(text, chunk_size)
+            chunks = DocumentEmbedder._chunk_by_paragraph(text, chunk_size)
         else:
             # Character-based chunking (default)
             chunks = []
@@ -87,7 +88,14 @@ class DocumentEmbedder:
                 chunks.append(chunk)
                 start = end - overlap
 
-            return chunks
+        # Filter out empty chunks and strip whitespace
+        original_count = len(chunks)
+        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+
+        if original_count > len(chunks):
+            print(f"Warning: Removed {original_count - len(chunks)} empty chunk(s)")
+
+        return chunks
 
     @staticmethod
     def _chunk_by_paragraph(text: str, max_chunk_size: int = 1000) -> List[str]:
@@ -288,23 +296,34 @@ class DocumentEmbedder:
                     chunks.append(sentence[i:i+max_chunk_size])
                 return chunks
 
-        # Step 2: Generate embeddings for all sentences
-        print(f"Generating embeddings for {len(sentences)} sentences...")
-        embeddings = []
-        valid_sentences = []
+        # Step 2: Generate embeddings for all sentences (BATCH MODE - much faster!)
+        print(f"Generating embeddings for {len(sentences)} sentences using batch API...")
 
-        for i, sentence in enumerate(sentences, 1):
-            try:
-                if i % 50 == 0:  # Progress update every 50 sentences
-                    print(f"  Progress: {i}/{len(sentences)} sentences")
+        try:
+            # Use batch API - sends all sentences in one or more batches
+            embeddings = self.get_embeddings_batch(sentences, batch_size=100)
+            valid_sentences = sentences
+            print(f"✓ Generated {len(embeddings)} embeddings in batch mode")
 
-                embedding = self.get_embedding(sentence)
-                embeddings.append(embedding)
-                valid_sentences.append(sentence)
-            except Exception as e:
-                print(f"Warning: Failed to get embedding for sentence {i}: {e}")
-                # Skip this sentence
-                continue
+        except Exception as e:
+            print(f"Warning: Batch embedding failed ({e}), falling back to individual requests...")
+
+            # Fallback: Generate embeddings one by one
+            embeddings = []
+            valid_sentences = []
+
+            for i, sentence in enumerate(sentences, 1):
+                try:
+                    if i % 50 == 0:  # Progress update every 50 sentences
+                        print(f"  Progress: {i}/{len(sentences)} sentences")
+
+                    embedding = self.get_embedding(sentence)
+                    embeddings.append(embedding)
+                    valid_sentences.append(sentence)
+                except Exception as sentence_error:
+                    print(f"Warning: Failed to get embedding for sentence {i}: {sentence_error}")
+                    # Skip this sentence
+                    continue
 
         if not valid_sentences:
             print("Error: No valid embeddings generated, falling back to character chunking")
@@ -368,6 +387,21 @@ class DocumentEmbedder:
         return sha256_hash.hexdigest()
 
     def get_embedding(self, text: str) -> List[float]:
+        """
+        Get embedding vector for text using LM Studio
+
+        Args:
+            text: Text to embed (must be non-empty)
+
+        Returns:
+            Embedding vector as list of floats
+
+        Raises:
+            ValueError: If text is empty or only whitespace
+            Exception: If API request fails
+        """
+        if not text or not text.strip():
+            raise ValueError("Cannot generate embedding for empty text")
 
         try:
             response = requests.post(
@@ -384,6 +418,110 @@ class DocumentEmbedder:
         except Exception as e:
             print(f"Error getting embedding: {e}")
             raise
+
+    def _process_single_batch(self, batch: List[str], batch_index: int, total_batches: int) -> tuple[int, List[List[float]]]:
+        """
+        Process a single batch of texts (helper for parallel processing)
+
+        Args:
+            batch: List of texts to embed
+            batch_index: Index of this batch (for ordering results)
+            total_batches: Total number of batches (for progress reporting)
+
+        Returns:
+            Tuple of (batch_index, embeddings) to maintain order
+        """
+        try:
+            response = requests.post(
+                f"{self.lm_studio_url}/embeddings",
+                json={
+                    "input": batch,
+                    "model": self.embedding_model
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Extract embeddings in order
+            batch_embeddings = [item['embedding'] for item in data['data']]
+
+            if total_batches > 1:
+                print(f"  ✓ Batch {batch_index + 1}/{total_batches} completed ({len(batch)} texts)")
+
+            return (batch_index, batch_embeddings)
+
+        except Exception as e:
+            print(f"  ✗ Error in batch {batch_index + 1}/{total_batches}: {e}")
+            raise
+
+    def get_embeddings_batch(self, texts: List[str], batch_size: int = 100,
+                            max_workers: int = None) -> List[List[float]]:
+        """
+        Get embedding vectors for multiple texts using batch API with parallel processing
+
+        Args:
+            texts: List of texts to embed (must be non-empty)
+            batch_size: Maximum texts per API request (default: 100)
+            max_workers: Maximum parallel workers (default: from env or 4)
+
+        Returns:
+            List of embedding vectors (same order as input texts)
+
+        Raises:
+            ValueError: If any text is empty or only whitespace
+            Exception: If API request fails
+        """
+        if not texts:
+            return []
+
+        # Validate all texts are non-empty
+        for i, text in enumerate(texts):
+            if not text or not text.strip():
+                raise ValueError(f"Cannot generate embedding for empty text at index {i}")
+
+        # Get max_workers from parameter, env, or default to 4
+        if max_workers is None:
+            max_workers = int(os.getenv("EMBEDDING_MAX_WORKERS", "4"))
+
+        # Split into batches
+        batches = []
+        for i in range(0, len(texts), batch_size):
+            batches.append(texts[i:i + batch_size])
+
+        total_batches = len(batches)
+
+        # If only one batch, no need for parallel processing
+        if total_batches == 1:
+            print(f"Processing single batch of {len(texts)} texts...")
+            _, embeddings = self._process_single_batch(batches[0], 0, 1)
+            return embeddings
+
+        # Parallel processing for multiple batches
+        print(f"Processing {total_batches} batches in parallel (max {max_workers} workers)...")
+
+        # Store results with their original batch index
+        results = {}
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all batch processing tasks
+            future_to_index = {
+                executor.submit(self._process_single_batch, batch, i, total_batches): i
+                for i, batch in enumerate(batches)
+            }
+
+            # Collect results as they complete
+            for future in as_completed(future_to_index):
+                batch_index, batch_embeddings = future.result()
+                results[batch_index] = batch_embeddings
+
+        # Reconstruct embeddings in original order
+        all_embeddings = []
+        for i in range(total_batches):
+            all_embeddings.extend(results[i])
+
+        print(f"✓ Completed all {total_batches} batches ({len(all_embeddings)} total embeddings)")
+        return all_embeddings
 
     def process_document(self, file_path: str, table_name: str = "documents",
                          chunk_size: int = 1000, overlap: int = 200, strategy: str = "character",
@@ -444,16 +582,28 @@ class DocumentEmbedder:
         chunks = self.chunk_text(text, chunk_size, overlap, strategy, similarity_threshold)
         print(f"Created {len(chunks)} chunks")
 
-        print("Generating embeddings...")
-        chunks_with_embeddings = []
+        print(f"Generating embeddings for {len(chunks)} chunks using batch API...")
         processed_at = datetime.utcnow().isoformat()
 
-        for i, chunk in enumerate(chunks, 1):
-            if progress_callback:
-                progress_callback("embedding", f"Generating embeddings... ({i}/{len(chunks)})")
+        if progress_callback:
+            progress_callback("embedding", f"Generating embeddings for {len(chunks)} chunks...")
 
-            print(f"Processing chunk {i}/{len(chunks)}")
-            embedding = self.get_embedding(chunk)
+        # Generate all embeddings in batch mode (much faster!)
+        try:
+            embeddings = self.get_embeddings_batch(chunks, batch_size=100)
+            print(f"✓ Generated {len(embeddings)} embeddings in batch mode")
+        except Exception as e:
+            print(f"Warning: Batch embedding failed ({e}), falling back to sequential processing...")
+            embeddings = []
+            for i, chunk in enumerate(chunks, 1):
+                if progress_callback:
+                    progress_callback("embedding", f"Generating embeddings... ({i}/{len(chunks)})")
+                print(f"Processing chunk {i}/{len(chunks)}")
+                embeddings.append(self.get_embedding(chunk))
+
+        # Build chunks with embeddings
+        chunks_with_embeddings = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings), 1):
             chunks_with_embeddings.append({
                 "content": chunk,
                 "embedding": embedding,

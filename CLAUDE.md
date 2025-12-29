@@ -36,6 +36,7 @@ TABLE_NAME=documents  # Optional
 CHUNKING_STRATEGY=paragraph  # Optional: "character", "paragraph", or "semantic" (default: "character")
 SEMANTIC_SIMILARITY_THRESHOLD=0.75  # Optional: For semantic chunking (0.0-1.0, default: 0.75)
 SKIP_IF_EXISTS=true  # Optional: Skip unchanged documents (default: true)
+EMBEDDING_MAX_WORKERS=4  # Optional: Max parallel workers for batch embedding (default: 4)
 ```
 
 ## Development Commands
@@ -559,6 +560,9 @@ CHUNKING_STRATEGY=paragraph     # character, paragraph, or semantic
 SEMANTIC_SIMILARITY_THRESHOLD=0.75  # For semantic chunking (0.0-1.0, try 0.85 for stricter grouping)
 TABLE_NAME=documents            # Default: documents
 SKIP_IF_EXISTS=true            # Default: true
+
+# Performance Configuration
+EMBEDDING_MAX_WORKERS=4         # Default: 4 - Max parallel workers for batch embedding requests
 ```
 
 ## Architecture
