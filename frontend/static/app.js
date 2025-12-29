@@ -407,7 +407,7 @@ function displaySearchResults(results, filters = {}) {
                     </div>
                     <div class="similarity-score">${similarity}% match</div>
                 </div>
-                <div class="search-result-content">${escapeHtml(content)}</div>
+                <div class="search-result-content">${escapeHtml(content).replace(/\\n/g, '\n').replace(/\n/g, '<br>')}</div>
             </div>
         `;
     });
@@ -920,6 +920,9 @@ function formatMessageContent(content) {
     // This preserves the code content and prevents double-escaping
     const codeBlocks = [];
     let codeBlockIndex = 0;
+
+    // Convert escaped newlines (\n) to actual newlines FIRST
+    content = content.replace(/\\n/g, '\n');
 
     // Replace code blocks with unique placeholders that won't conflict with markdown
     content = content.replace(/```(\w+)?\n([\s\S]+?)```/g, (match, language, code) => {

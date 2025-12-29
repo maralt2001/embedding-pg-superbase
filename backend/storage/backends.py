@@ -185,7 +185,7 @@ class PostgreSQLBackend(StorageBackend):
                 # Note: Use [...] for vector type, {...} for array type
                 embedding_str = '[' + ','.join(map(str, chunk['embedding'])) + ']'
 
-                # Escape special characters for CSV
+                # For COPY TEXT format, escape backslash, newline, carriage return, and tab
                 content = chunk['content'].replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
                 document_name = chunk['document_name'].replace('\\', '\\\\').replace('\t', '\\t')
                 file_hash = chunk['file_hash'].replace('\\', '\\\\').replace('\t', '\\t')
