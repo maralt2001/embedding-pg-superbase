@@ -393,7 +393,7 @@ function displaySearchResults(results, filters = {}) {
     let html = `<p style="margin-bottom: 20px; color: #6c757d;">Found ${results.length} result(s)${filterInfo}</p>`;
 
     results.forEach((result, index) => {
-        const similarity = (result.similarity * 100).toFixed(1);
+        const similarity = (result.similarity_score * 100).toFixed(1);
         const content = result.content.length > 300
             ? result.content.substring(0, 300) + '...'
             : result.content;
@@ -569,7 +569,7 @@ function addChatMessage(role, content, sources = null) {
         const uniqueSources = {};
         sources.forEach(source => {
             const docName = source.document_name;
-            if (!uniqueSources[docName] || source.similarity > uniqueSources[docName].similarity) {
+            if (!uniqueSources[docName] || source.similarity_score > uniqueSources[docName].similarity_score) {
                 uniqueSources[docName] = source;
             }
         });
@@ -579,7 +579,7 @@ function addChatMessage(role, content, sources = null) {
             const sourceItem = document.createElement('div');
             sourceItem.className = 'source-item';
 
-            const similarity = (source.similarity * 100).toFixed(1);
+            const similarity = (source.similarity_score * 100).toFixed(1);
             sourceItem.innerHTML = `
                 <span class="source-name">${escapeHtml(source.document_name)}</span>
                 <span class="source-similarity"> (${similarity}% match)</span>
@@ -664,7 +664,7 @@ function finalizeStreamingMessage(messageId, content, sources) {
         const uniqueSources = {};
         sources.forEach(source => {
             const docName = source.document_name;
-            if (!uniqueSources[docName] || source.similarity > uniqueSources[docName].similarity) {
+            if (!uniqueSources[docName] || source.similarity_score > uniqueSources[docName].similarity_score) {
                 uniqueSources[docName] = source;
             }
         });
@@ -674,7 +674,7 @@ function finalizeStreamingMessage(messageId, content, sources) {
             const sourceItem = document.createElement('div');
             sourceItem.className = 'source-item';
 
-            const similarity = (source.similarity * 100).toFixed(1);
+            const similarity = (source.similarity_score * 100).toFixed(1);
             sourceItem.innerHTML = `
                 <span class="source-name">${escapeHtml(source.document_name)}</span>
                 <span class="source-similarity"> (${similarity}% match)</span>

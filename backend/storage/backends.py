@@ -395,7 +395,7 @@ class PostgreSQLBackend(StorageBackend):
                     'content': row[0],
                     'document_name': row[1],
                     'chunk_index': row[2],
-                    'similarity': float(row[3])
+                    'similarity_score': float(row[3])  # Renamed from 'similarity' for clarity
                 })
 
             return results

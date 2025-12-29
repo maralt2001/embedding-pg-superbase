@@ -186,7 +186,7 @@ def cmd_search(args):
 
         for i, result in enumerate(results, 1):
             print(f"{'='*60}")
-            print(f"Result {i} (Score: {result.get('similarity', 'N/A'):.4f})")
+            print(f"Result {i} (Score: {result.get('similarity_score', 0):.4f})")
             print(f"{'='*60}")
             print(f"Document: {result['document_name']}")
             print(f"Chunk: {result['chunk_index']}")

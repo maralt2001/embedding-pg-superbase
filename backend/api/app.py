@@ -369,7 +369,7 @@ async def chat_with_documents(
                 sources.append({
                     "document_name": result["document_name"],
                     "chunk_index": result.get("chunk_index", 0),
-                    "similarity": result.get("similarity", 0)
+                    "similarity_score": result.get("similarity_score", 0)
                 })
             context = "\n\n".join(context_parts)
 
