@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Embedding Logo Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+        }
+
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .logo-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .logo-card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .logo-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .size-demo {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .background-demo {
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .bg-white { background: white; }
+        .bg-dark { background: #1a202c; }
+        .bg-light { background: #f7fafc; }
+
+        .description {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-top: 30px;
+        }
+
+        .description h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .description ul {
+            list-style-position: inside;
+            color: #4a5568;
+            line-height: 1.8;
+        }
+
+        .description p {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .color-palette {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .color-swatch {
+            flex: 1;
+            min-width: 100px;
+            height: 80px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        code {
+            background: #f7fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Document Embedding Logo</h1>
+
+        <div class="logo-grid">
+            <!-- Main Logo with Text -->
+            <div class="logo-card">
+                <h2>Main Logo (with text)</h2>
+                <div class="logo-preview">
+                    <img src="frontend/static/logo.svg" alt="Logo" style="width: 200px; height: 200px;">
+                    <div class="size-demo">
+                        <img src="frontend/static/logo.svg" alt="Logo Small" style="width: 64px; height: 64px;">
+                        <img src="frontend/static/logo.svg" alt="Logo Medium" style="width: 128px; height: 128px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Icon Only -->
+            <div class="logo-card">
+                <h2>Icon Only (favicon)</h2>
+                <div class="logo-preview">
+                    <img src="frontend/static/logo-icon.svg" alt="Icon" style="width: 200px; height: 200px;">
+                    <div class="size-demo">
+                        <img src="frontend/static/logo-icon.svg" alt="Icon Small" style="width: 32px; height: 32px;">
+                        <img src="frontend/static/logo-icon.svg" alt="Icon Medium" style="width: 64px; height: 64px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Background Variations -->
+        <div class="logo-card">
+            <h2>Background Variations</h2>
+            <div style="display: flex; gap: 30px; justify-content: center; flex-wrap: wrap;">
+                <div class="background-demo bg-white">
+                    <img src="frontend/static/logo-icon.svg" alt="Icon" style="width: 128px; height: 128px;">
+                    <p style="text-align: center; margin-top: 10px; color: #4a5568;">Light</p>
+                </div>
+                <div class="background-demo bg-dark">
+                    <img src="frontend/static/logo-icon.svg" alt="Icon" style="width: 128px; height: 128px;">
+                    <p style="text-align: center; margin-top: 10px; color: white;">Dark</p>
+                </div>
+                <div class="background-demo bg-light">
+                    <img src="frontend/static/logo-icon.svg" alt="Icon" style="width: 128px; height: 128px;">
+                    <p style="text-align: center; margin-top: 10px; color: #4a5568;">Gray</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Description -->
+        <div class="description">
+            <h2>Design Concept</h2>
+            <p><strong>Symbolism:</strong></p>
+            <ul>
+                <li>📄 <strong>Document:</strong> White paper with folded corner representing source documents</li>
+                <li>🔗 <strong>Embedding Vectors:</strong> Golden dots connected by lines showing the transformation to vector space</li>
+                <li>➡️ <strong>Arrow:</strong> Represents the embedding transformation process</li>
+                <li>🎨 <strong>Gradient Background:</strong> Purple-blue gradient suggesting AI/ML technology</li>
+            </ul>
+
+            <h2 style="margin-top: 30px;">Color Palette</h2>
+            <div class="color-palette">
+                <div class="color-swatch" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    Purple-Blue<br>Gradient
+                </div>
+                <div class="color-swatch" style="background: #fbbf24;">
+                    Golden<br>#fbbf24
+                </div>
+                <div class="color-swatch" style="background: #667eea;">
+                    Indigo<br>#667eea
+                </div>
+                <div class="color-swatch" style="background: white; color: #4a5568; border: 2px solid #e5e7eb;">
+                    White<br>#ffffff
+                </div>
+            </div>
+
+            <h2 style="margin-top: 30px;">Usage</h2>
+            <p><strong>Files created:</strong></p>
+            <ul>
+                <li><code>frontend/static/logo.svg</code> - Main logo with text (200x200px)</li>
+                <li><code>frontend/static/logo-icon.svg</code> - Icon only version for favicon</li>
+            </ul>
+
+            <p style="margin-top: 15px;"><strong>Use cases:</strong></p>
+            <ul>
+                <li>Website header/navigation</li>
+                <li>Favicon (use logo-icon.svg)</li>
+                <li>Documentation</li>
+                <li>Social media profiles</li>
+                <li>Application splash screen</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

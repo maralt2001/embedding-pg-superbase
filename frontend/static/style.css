@@ -991,6 +991,10 @@ footer {
         font-size: 1.8em;
     }
 
+    .subtitle {
+        font-size: 1em;
+    }
+
     .tab-content {
         padding: 20px;
     }
