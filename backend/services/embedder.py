@@ -38,7 +38,9 @@ class DocumentEmbedder:
         # Text files
         if file_path.suffix == '.txt':
             with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
+                text = f.read()
+                # Remove null bytes that PostgreSQL can't handle
+                return text.replace('\x00', '')
 
         # PDF files
         elif file_path.suffix == '.pdf':
@@ -48,12 +50,15 @@ class DocumentEmbedder:
                 page = pdf_document[page_num]
                 text.append(page.get_text())
             pdf_document.close()
-            return '\n'.join(text)
+            # Remove null bytes that PostgreSQL can't handle
+            return '\n'.join(text).replace('\x00', '')
 
         # Word documents
         elif file_path.suffix == '.docx':
             doc = docx.Document(file_path)
-            return '\n'.join([para.text for para in doc.paragraphs])
+            text = '\n'.join([para.text for para in doc.paragraphs])
+            # Remove null bytes that PostgreSQL can't handle
+            return text.replace('\x00', '')
 
         else:
             raise ValueError(f"Unsupported file type: {file_path.suffix}")

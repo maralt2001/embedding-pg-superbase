@@ -186,7 +186,8 @@ class PostgreSQLBackend(StorageBackend):
                 embedding_str = '[' + ','.join(map(str, chunk['embedding'])) + ']'
 
                 # For COPY TEXT format, escape backslash, newline, carriage return, and tab
-                content = chunk['content'].replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                # Also remove null bytes that PostgreSQL can't handle
+                content = chunk['content'].replace('\x00', '').replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
                 document_name = chunk['document_name'].replace('\\', '\\\\').replace('\t', '\\t')
                 file_hash = chunk['file_hash'].replace('\\', '\\\\').replace('\t', '\\t')
                 processed_at = chunk['processed_at'].replace('\\', '\\\\').replace('\t', '\\t')
@@ -221,9 +222,10 @@ class PostgreSQLBackend(StorageBackend):
 
         try:
             # Prepare data tuples
+            # Sanitize content to remove null bytes that PostgreSQL can't handle
             values = [
                 (
-                    chunk["content"],
+                    chunk["content"].replace('\x00', ''),  # Remove null bytes as backup
                     chunk["embedding"],
                     chunk["document_name"],
                     chunk["chunk_index"],
@@ -255,9 +257,10 @@ class PostgreSQLBackend(StorageBackend):
 
         try:
             # Prepare data tuples
+            # Sanitize content to remove null bytes that PostgreSQL can't handle
             values = [
                 (
-                    chunk["content"],
+                    chunk["content"].replace('\x00', ''),  # Remove null bytes as backup
                     chunk["embedding"],
                     chunk["document_name"],
                     chunk["chunk_index"],

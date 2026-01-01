@@ -949,6 +949,11 @@ function formatMessageContent(content) {
     // Three or more hyphens on a line by themselves
     formatted = formatted.replace(/^-{3,}$/gm, '<hr>');
 
+    // Convert |word| or [word] patterns to styled section headers
+    // Must be done before markdown formatting
+    // Match patterns like |Optionen| or [Optionen] at start of line
+    formatted = formatted.replace(/^[\|\[]([^\|\[\]]+)[\|\]]\s*$/gm, '<div class="section-header">$1</div>');
+
     // Convert markdown-style formatting
     // Bold: **text** or __text__
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -988,6 +993,10 @@ function formatMessageContent(content) {
     // Remove <br> before and after headings
     formatted = formatted.replace(/(<br>)+(<h[1-6]>)/g, '$2');
     formatted = formatted.replace(/(<\/h[1-6]>)(<br>)+/g, '$1');
+
+    // Remove <br> before and after section headers
+    formatted = formatted.replace(/(<br>)+(<div class="section-header">)/g, '$2');
+    formatted = formatted.replace(/(<\/div>)(<br>)+(?=<ul>)/g, '$1');
 
     // Remove <br> before and after horizontal rules
     formatted = formatted.replace(/(<br>)+(<hr>)/g, '$2');
